@@ -14,3 +14,13 @@
 .editor-header.right-align {
   justify-content: flex-end;
 }
+
+.a11yInlineDecoration {
+  text-decoration: underline wavy #d28a00;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
+.a11yRangeDecoration {
+  background-color: rgba(210, 138, 0, 0.12);
+}

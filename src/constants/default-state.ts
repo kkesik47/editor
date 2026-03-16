@@ -14,6 +14,7 @@ import {
   VEGA_LITE_START_SPEC,
   View,
 } from './consts.js';
+import type { AccessibilityIssue } from '../features/accessibility/types.js';
 
 export type State = {
   isAuthenticated: boolean;
@@ -67,6 +68,7 @@ export type State = {
   /** https://vega.github.io/vega/usage/interpreter/ */
   expressionInterpreter: boolean;
   runtime: any;
+  accessibilityIssues: AccessibilityIssue[];
 };
 
 export const DEFAULT_STATE: State = {
@@ -120,4 +122,5 @@ export const DEFAULT_STATE: State = {
   backgroundColor: '#ffffff',
   expressionInterpreter: false,
   runtime: null,
+  accessibilityIssues: [],
 };

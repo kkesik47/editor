@@ -2,16 +2,123 @@ import stringify from 'json-stringify-pretty-compact';
 import Editor from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import * as React from 'react';
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useAppContext} from '../../../context/app-context.js';
 import './index.css';
 import {EDITOR_FOCUS, KEYCODES, Mode, SCHEMA, SIDEPANE} from '../../../constants/index.js';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
-import {parse as parseJSONC} from 'jsonc-parser';
+import {findNodeAtLocation, parse as parseJSONC, parseTree} from 'jsonc-parser';
 import LZString from 'lz-string';
 import ResizeObserver from 'rc-resize-observer';
 import {debounce} from 'vega';
 import parser from 'vega-schema-url-parser';
+import type {AccessibilityIssue} from '../../../features/accessibility/types.js';
+
+type MonacoModule = typeof import('monaco-editor');
+
+function jsonPointerToPath(pointer: string): (string | number)[] {
+  if (!pointer || pointer === '/') {
+    return [];
+  }
+  return pointer
+    .split('/')
+    .slice(1)
+    .map((token) => token.replaceAll('~1', '/').replaceAll('~0', '~'))
+    .map((token) => {
+      const asNumber = Number(token);
+      return Number.isInteger(asNumber) && `${asNumber}` === token ? asNumber : token;
+    });
+}
+
+function toIssueDecorations(
+  issues: AccessibilityIssue[],
+  editor: Monaco.editor.IStandaloneCodeEditor | null,
+): Monaco.editor.IModelDeltaDecoration[] {
+  const model = editor?.getModel();
+  if (!model) {
+    return [];
+  }
+
+  const tree = parseTree(model.getValue());
+  if (!tree) {
+    return [];
+  }
+
+  const decorations: Monaco.editor.IModelDeltaDecoration[] = [];
+  for (const issue of issues) {
+    if (!issue.jsonPointer) {
+      continue;
+    }
+    const path = jsonPointerToPath(issue.jsonPointer);
+    const node = findNodeAtLocation(tree, path);
+    if (!node) {
+      continue;
+    }
+    const start = model.getPositionAt(node.offset);
+    const end = model.getPositionAt(node.offset + node.length);
+
+    decorations.push({
+      range: {
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: end.column,
+      },
+      options: {
+        className: 'a11yRangeDecoration',
+        inlineClassName: 'a11yInlineDecoration',
+        stickiness: 1,
+        hoverMessage: {
+          value: `**Accessibility** (${issue.severity})\n\n${issue.message}\n\nSuggestion: ${issue.suggestion}`,
+        },
+      },
+    });
+  }
+
+  return decorations;
+}
+
+function toIssueMarkers(
+  issues: AccessibilityIssue[],
+  editor: Monaco.editor.IStandaloneCodeEditor | null,
+  monaco: MonacoModule | null,
+): Monaco.editor.IMarkerData[] {
+  const model = editor?.getModel();
+  if (!model || !monaco) {
+    return [];
+  }
+
+  const tree = parseTree(model.getValue());
+  if (!tree) {
+    return [];
+  }
+
+  const markers: Monaco.editor.IMarkerData[] = [];
+  for (const issue of issues) {
+    if (!issue.jsonPointer) {
+      continue;
+    }
+
+    const path = jsonPointerToPath(issue.jsonPointer);
+    const node = findNodeAtLocation(tree, path);
+    if (!node) {
+      continue;
+    }
+
+    const start = model.getPositionAt(node.offset);
+    const end = model.getPositionAt(node.offset + node.length);
+    markers.push({
+      startLineNumber: start.lineNumber,
+      startColumn: start.column,
+      endLineNumber: end.lineNumber,
+      endColumn: end.column,
+      severity: monaco.MarkerSeverity.Warning,
+      source: issue.ruleId,
+      message: `${issue.message}\nSuggestion: ${issue.suggestion}`,
+    });
+  }
+  return markers;
+}
 
 const EditorWithNavigation: React.FC<{
   clearConfig: () => void;
@@ -28,9 +135,10 @@ const EditorWithNavigation: React.FC<{
   updateVegaSpec: (spec: string, config?: string) => void;
 }> = (props) => {
   const {state} = useAppContext();
-  const {mode, editorString, decorations, manualParse, parse, sidePaneItem, configEditorString} = state;
+  const {mode, editorString, decorations, manualParse, parse, sidePaneItem, configEditorString, accessibilityIssues} = state;
 
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<MonacoModule | null>(null);
   const [currentDecorationIds, setCurrentDecorationIds] = useState<string[]>([]);
 
   const navigate = useNavigate();
@@ -118,8 +226,9 @@ const EditorWithNavigation: React.FC<{
   }, [sidePaneItem]);
 
   const handleEditorDidMount = useCallback(
-    (editor: Monaco.editor.IStandaloneCodeEditor) => {
+    (editor: Monaco.editor.IStandaloneCodeEditor, monaco: MonacoModule) => {
       editorRef.current = editor;
+      monacoRef.current = monaco;
       props.setEditorReference(editor);
 
       const addVegaSchemaURL = () => {
@@ -239,12 +348,27 @@ const EditorWithNavigation: React.FC<{
     [manualParse, props.updateEditorString, debouncedUpdateSpec, location.pathname, navigate],
   );
 
+  const mergedDecorations = useMemo(() => {
+    const issueDecorations = toIssueDecorations(accessibilityIssues || [], editorRef.current);
+    return [...(Array.isArray(decorations) ? decorations : []), ...issueDecorations];
+  }, [accessibilityIssues, decorations, editorString]);
+
   useEffect(() => {
-    if (editorRef.current && decorations && Array.isArray(decorations)) {
-      const newDecorationIds = editorRef.current.deltaDecorations(currentDecorationIds, decorations);
+    if (editorRef.current) {
+      const newDecorationIds = editorRef.current.deltaDecorations(currentDecorationIds, mergedDecorations);
       setCurrentDecorationIds(newDecorationIds);
     }
-  }, [decorations]);
+  }, [mergedDecorations]);
+
+  useEffect(() => {
+    const model = editorRef.current?.getModel();
+    if (!model || !monacoRef.current) {
+      return;
+    }
+
+    const markers = toIssueMarkers(accessibilityIssues || [], editorRef.current, monacoRef.current);
+    monacoRef.current.editor.setModelMarkers(model, 'vega-editor-a11y', markers);
+  }, [accessibilityIssues, editorString]);
 
   return (
     <ResizeObserver

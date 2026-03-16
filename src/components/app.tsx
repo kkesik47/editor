@@ -15,6 +15,7 @@ import {useAppContext} from '../context/app-context';
 import {LocalLogger} from '../utils/logger';
 import {parseJSONCOrThrow, parseJSONC} from '../utils/jsonc-parser';
 import {validateVega, validateVegaLite} from '../utils/validate';
+import { evaluateVegaLiteAccessibility } from '../features/accessibility';
 import './app.css';
 import './split.css';
 import Header from './header/renderer.js';
@@ -213,6 +214,14 @@ const App: React.FC<Props> = (props) => {
 
         validateVegaLite(vegaLiteSpec, currLogger);
 
+        const accessibilityIssues = evaluateVegaLiteAccessibility(vegaLiteSpec as Record<string, any>);
+        for (const issue of accessibilityIssues) {
+          currLogger.warn(
+            `[A11Y:${issue.ruleId}] ${issue.message} (at ${issue.jsonPointer}) Suggestion: ${issue.suggestion}`,
+          );
+        }
+
+
         const compileResult =
           editorString !== '{}' ? vegaLite.compile(vegaLiteSpec, options) : {spec: {}, normalized: {}};
         const normalizedSpec = compileResult.normalized;
@@ -227,6 +236,7 @@ const App: React.FC<Props> = (props) => {
           warns: currLogger.warns,
           infos: currLogger.infos,
           debugs: currLogger.debugs,
+          accessibilityIssues,
           error: null,
         }));
       } catch (error: any) {
@@ -238,6 +248,7 @@ const App: React.FC<Props> = (props) => {
           warns: currLogger.warns,
           infos: currLogger.infos,
           debugs: currLogger.debugs,
+          accessibilityIssues: [],
         }));
       }
     },
@@ -273,6 +284,7 @@ const App: React.FC<Props> = (props) => {
           warns: currLogger.warns,
           infos: currLogger.infos,
           debugs: currLogger.debugs,
+          accessibilityIssues: [],
           error: null,
         }));
       } catch (error: any) {
@@ -280,6 +292,7 @@ const App: React.FC<Props> = (props) => {
           ...s,
           error: {message: error.message},
           parse: false,
+          accessibilityIssues: [],
           errors: currLogger.errors,
           warns: currLogger.warns,
           infos: currLogger.infos,
