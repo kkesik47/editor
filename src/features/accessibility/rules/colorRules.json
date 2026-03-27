@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "vl-a11y-color-risk-rules",
+  "title": "Vega-Lite Color Risk Knowledge Base",
+  "description": "Declarative knowledge base for color-family definitions and known high-risk combinations for common color vision deficiency scenarios.",
+  "classificationModel": {
+    "space": "HSL",
+    "notes": "Prototype uses broad hue/saturation/lightness heuristics for explainable family assignment."
+  },
+  "families": [
+    {
+      "id": "red",
+      "label": "Red",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.35,
+        "lightnessMin": 0.2,
+        "lightnessMax": 0.8,
+        "hueRanges": [[0, 20], [340, 360]]
+      }
+    },
+    {
+      "id": "green",
+      "label": "Green",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.28,
+        "lightnessMin": 0.2,
+        "lightnessMax": 0.85,
+        "hueRanges": [[80, 165]]
+      }
+    },
+    {
+      "id": "blue",
+      "label": "Blue",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.3,
+        "lightnessMin": 0.2,
+        "lightnessMax": 0.82,
+        "hueRanges": [[195, 255]]
+      }
+    },
+    {
+      "id": "purple",
+      "label": "Purple",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.25,
+        "lightnessMin": 0.22,
+        "lightnessMax": 0.82,
+        "hueRanges": [[256, 315]]
+      }
+    },
+    {
+      "id": "brown",
+      "label": "Brown",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.3,
+        "lightnessMax": 0.45,
+        "hueRanges": [[15, 45]]
+      }
+    },
+    {
+      "id": "black",
+      "label": "Black",
+      "type": "neutral",
+      "thresholds": {
+        "lightnessMax": 0.18,
+        "saturationMax": 0.25
+      }
+    },
+    {
+      "id": "pink",
+      "label": "Pink",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.22,
+        "lightnessMin": 0.58,
+        "hueRanges": [[310, 350], [0, 12]]
+      }
+    },
+    {
+      "id": "turquoise",
+      "label": "Turquoise",
+      "type": "chromatic",
+      "thresholds": {
+        "saturationMin": 0.25,
+        "lightnessMin": 0.3,
+        "lightnessMax": 0.82,
+        "hueRanges": [[166, 194]]
+      }
+    },
+    {
+      "id": "gray",
+      "label": "Gray",
+      "type": "neutral",
+      "thresholds": {
+        "saturationMax": 0.14,
+        "lightnessMin": 0.2,
+        "lightnessMax": 0.82
+      }
+    }
+  ],
+  "riskyCombinations": [
+    {
+      "id": "red-green",
+      "label": "Red/Green pairing",
+      "families": ["red", "green"],
+      "severity": "warning",
+      "message": "The visualization combines red and green families, which can be difficult to distinguish for users with common red-green color vision deficiencies.",
+      "suggestion": "Use a colorblind-safe palette (e.g., blue/orange) or add shape, pattern, labels, or direct annotations.",
+      "cvdTypes": ["protanopia", "deuteranopia"],
+      "rationale": "Red-green confusions are among the most common CVD-related failures in categorical encodings."
+    },
+    {
+      "id": "purple-blue",
+      "label": "Purple/Blue proximity",
+      "families": ["purple", "blue"],
+      "severity": "info",
+      "message": "Purple and blue can become hard to separate at small sizes or low contrast.",
+      "suggestion": "Increase lightness separation or add non-color encoding channels.",
+      "cvdTypes": ["tritanopia"],
+      "rationale": "Blue-purple hues can cluster perceptually, especially in legends and thin marks."
+    },
+    {
+      "id": "red-black",
+      "label": "Red/Black contrast ambiguity",
+      "families": ["red", "black"],
+      "severity": "warning",
+      "message": "Red and black combinations can lose category distinction in low-lightness contexts.",
+      "suggestion": "Lift red lightness/chroma or replace black with a lighter neutral.",
+      "cvdTypes": ["protanopia", "deuteranopia"],
+      "rationale": "Dark reds can collapse toward black for some viewers and at small visual scales."
+    },
+    {
+      "id": "brown-green-red",
+      "label": "Brown/Green/Red triad",
+      "families": ["brown", "green", "red"],
+      "severity": "warning",
+      "message": "The brown-green-red triad can be especially ambiguous in thematic maps and stacked marks.",
+      "suggestion": "Use distinct hue families plus texture or symbols for robust differentiation.",
+      "cvdTypes": ["protanopia", "deuteranopia"],
+      "rationale": "This triad combines multiple warm/earth tones often reported as hard to separate."
+    },
+    {
+      "id": "pink-turquoise-gray",
+      "label": "Pink/Turquoise/Gray low-salience mix",
+      "families": ["pink", "turquoise", "gray"],
+      "severity": "info",
+      "message": "Pink, turquoise, and gray together may produce low-salience distinctions for some audiences.",
+      "suggestion": "Increase contrast and add labels or shape channels for critical comparisons.",
+      "cvdTypes": ["tritanopia", "achromatopsia"],
+      "notes": "Useful as a conservative warning in pastel-themed dashboards."
+    },
+    {
+      "id": "green-black",
+      "label": "Green/Black dark-range pairing",
+      "families": ["green", "black"],
+      "severity": "info",
+      "message": "Green paired with black can become difficult to parse when mark area is small.",
+      "suggestion": "Use brighter green shades and increase line/mark thickness or add labels.",
+      "cvdTypes": ["deuteranopia"],
+      "rationale": "Low-lightness greens can become visually merged with dark neutrals."
+    }
+  ]
+}

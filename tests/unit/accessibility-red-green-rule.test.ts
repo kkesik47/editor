@@ -2,12 +2,12 @@ import {describe, expect, it} from 'vitest';
 
 import {
   evaluateVegaLiteAccessibility,
-  redGreenRiskRule,
-  redGreenRiskRuleExampleIssue,
+  colorRiskRule,
+  colorRiskRuleExampleIssue,
 } from '../../src/features/accessibility';
 
-describe('redGreenRiskRule', () => {
-  it('returns an issue when both red-like and green-like colors are in encoding.color.scale.range', () => {
+describe('colorRiskRule (generic data-driven evaluator)', () => {
+  it('detects red/green risk from explicit scale range values', () => {
     const spec = {
       encoding: {
         color: {
@@ -21,88 +21,20 @@ describe('redGreenRiskRule', () => {
     const issues = evaluateVegaLiteAccessibility(spec);
 
     expect(issues).toHaveLength(1);
-    expect(issues[0].ruleId).toBe(redGreenRiskRule.id);
-    expect(issues[0].jsonPointer).toBe('/encoding/color/scale/range');
+    expect(issues[0].ruleId).toBe('vl-a11y-color-risk-rules:red-green');
     expect(issues[0].severity).toBe('warning');
+    expect(issues[0].jsonPointer).toBe('/encoding/color/scale/range/0');
   });
 
-  it('returns no issues when only red-like colors are present', () => {
+  it('detects configured non-red-green combinations from the same evaluator', () => {
     const spec = {
-      mark: {type: 'bar', color: '#ff0000'},
-      config: {
-        range: {
-          category: ['#b22222', '#ff6347'],
-        },
+      mark: {
+        type: 'point',
+        color: 'purple',
       },
-    };
-
-    const issues = evaluateVegaLiteAccessibility(spec);
-
-    expect(issues).toEqual([]);
-  });
-
-  it('detects red/green across different inspected locations', () => {
-    const spec = {
-      mark: {type: 'line', color: 'green'},
-      config: {
-        range: {
-          category: ['#ff0000', '#0000ff'],
-        },
-      },
-    };
-
-    const issues = evaluateVegaLiteAccessibility(spec);
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0].message).toContain('red-like and green-like');
-    expect(issues[0].evidence).toMatchObject({
-      inspectedSources: expect.arrayContaining([
-        'encoding.{color|stroke|fill}.scale.range',
-        'encoding.{color|stroke|fill}.value',
-        'encoding.{color|stroke|fill}.condition.value',
-        'mark.{color|stroke|fill}',
-        'config.range.category',
-        'data.values',
-      ]),
-    });
-  });
-
-  it('detects red/green from inline data when encoding.color.field uses scale: null', () => {
-    const spec = {
-      data: {
-        values: [
-          {category: 'A', value: 10, color: 'green'},
-          {category: 'B', value: 6, color: 'red'},
-        ],
-      },
-      mark: 'bar',
       encoding: {
-        x: {field: 'category', type: 'nominal'},
-        y: {field: 'value', type: 'quantitative'},
-        color: {field: 'color', type: 'nominal', scale: null},
-      },
-    };
-
-    const issues = evaluateVegaLiteAccessibility(spec);
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0].ruleId).toBe(redGreenRiskRule.id);
-    expect(issues[0].jsonPointer).toBe('/data/values/0/color');
-    expect(issues[0].evidence).toMatchObject({
-      redLikeColors: [{value: 'red', source: 'data.values', jsonPointer: '/data/values/1/color'}],
-      greenLikeColors: [{value: 'green', source: 'data.values', jsonPointer: '/data/values/0/color'}],
-    });
-  });
-
-  it('detects conditional red/green encoding values', () => {
-    const spec = {
-      encoding: {
-        color: {
-          condition: {
-            test: 'datum.value > 0',
-            value: 'green',
-          },
-          value: 'red',
+        fill: {
+          value: 'blue',
         },
       },
     };
@@ -110,39 +42,17 @@ describe('redGreenRiskRule', () => {
     const issues = evaluateVegaLiteAccessibility(spec);
 
     expect(issues).toHaveLength(1);
+    expect(issues[0].ruleId).toBe('vl-a11y-color-risk-rules:purple-blue');
+    expect(issues[0].severity).toBe('info');
     expect(issues[0].evidence).toMatchObject({
-      greenLikeColors: [{value: 'green', source: 'encoding.color.condition.value'}],
-      redLikeColors: [{value: 'red', source: 'encoding.color.value'}],
-    });
-    expect(issues[0].jsonPointer).toBe('/encoding/color/value');
-  });
-
-  it('detects layered mark colors', () => {
-    const spec = {
-      layer: [
-        {
-          mark: {type: 'bar', color: 'green'},
-        },
-        {
-          mark: {type: 'bar', color: 'red'},
-        },
-      ],
-    };
-
-    const issues = evaluateVegaLiteAccessibility(spec);
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0].evidence).toMatchObject({
-      greenLikeColors: [{value: 'green', source: 'mark.color', jsonPointer: '/layer/0/mark/color'}],
-      redLikeColors: [{value: 'red', source: 'mark.color', jsonPointer: '/layer/1/mark/color'}],
+      families: ['purple', 'blue'],
     });
   });
 
-  it('detects red/green when using stroke scale ranges', () => {
+  it('uses structured evidence with family mapping and extraction sources', () => {
     const spec = {
       encoding: {
         stroke: {
-          field: 'type',
           scale: {
             range: ['green', 'red'],
           },
@@ -154,20 +64,38 @@ describe('redGreenRiskRule', () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0].evidence).toMatchObject({
-      greenLikeColors: [{value: 'green', source: 'encoding.stroke.scale.range'}],
-      redLikeColors: [{value: 'red', source: 'encoding.stroke.scale.range'}],
+      ruleLabel: 'Red/Green pairing',
+      families: ['red', 'green'],
+      extractionSources: expect.arrayContaining([
+        'mark.{color|fill|stroke}',
+        'encoding.{color|fill|stroke}.value',
+        'encoding.{color|fill|stroke}.scale.range[]',
+        'config.range.*[]',
+      ]),
     });
-    expect(issues[0].jsonPointer).toBe('/encoding/stroke/scale/range');
   });
 
-  it('provides a stable example issue payload shape', () => {
-    expect(redGreenRiskRuleExampleIssue).toMatchObject({
-      ruleId: 'vl-a11y-red-green-risk',
+  it('returns no issues when no configured risky combination is present', () => {
+    const spec = {
+      mark: {type: 'bar', color: '#0000ff'},
+      encoding: {
+        fill: {value: '#00ffff'},
+      },
+    };
+
+    const issues = evaluateVegaLiteAccessibility(spec);
+
+    expect(issues).toEqual([]);
+  });
+
+  it('keeps default accessibility rules wired to the generic color risk rule', () => {
+    expect(colorRiskRule.id).toBe('vl-a11y-color-risk-engine');
+    expect(colorRiskRuleExampleIssue).toMatchObject({
+      ruleId: 'vl-a11y-color-risk-rules:red-green',
       severity: 'warning',
-      jsonPointer: '/encoding/color/scale/range',
       evidence: {
-        redLikeColors: expect.any(Array),
-        greenLikeColors: expect.any(Array),
+        ruleLabel: 'Red/Green pairing',
+        families: ['red', 'green'],
       },
     });
   });
