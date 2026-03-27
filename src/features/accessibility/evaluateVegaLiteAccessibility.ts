@@ -1,7 +1,11 @@
 import {AccessibilityIssue, AccessibilityRule} from './types.js';
 import {colorRiskRule} from './rules/colorRiskRule.js';
+import {colorblindSafetyRule} from './rules/colorblindSafetyRule.js';
 
-const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [colorRiskRule];
+const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [
+  colorRiskRule,
+  colorblindSafetyRule,
+];
 
 export function evaluateVegaLiteAccessibility(
   spec: Record<string, any>,
