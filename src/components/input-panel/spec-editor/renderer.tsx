@@ -110,8 +110,9 @@ function toIssueMarkers(
     markers.push({
       startLineNumber: start.lineNumber,
       startColumn: start.column,
-      endLineNumber: end.lineNumber,
-      endColumn: end.column,
+      //Monaco always shows marker messages on hover, so to supress them and display clearer warning we give it 0 width
+      endLineNumber: start.lineNumber,
+      endColumn: start.column,
       severity: monaco.MarkerSeverity.Warning,
       source: issue.ruleId,
       message: `${issue.message}\nSuggestion: ${issue.suggestion}`,
