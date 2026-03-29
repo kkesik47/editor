@@ -30,6 +30,106 @@ function jsonPointerToPath(pointer: string): (string | number)[] {
     });
 }
 
+/**
+ * Build an inline SVG showing "Normal" and "Simulated" color previews.
+ *
+ * Sequential scales → smooth linear gradient (matches chart legend).
+ * Categorical scales → discrete color swatches.
+ *
+ * Returns an encoded data URI string for embedding in Markdown, or
+ * an empty string if the issue has no color preview data.
+ */
+function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
+  const {originalColors, simulatedColors, cvdType, scaleType} = issue.evidence ?? {};
+  if (
+    !Array.isArray(originalColors) ||
+    !Array.isArray(simulatedColors) ||
+    originalColors.length === 0
+  ) {
+    return '';
+  }
+
+  // Human-readable CVD label
+  const cvdLabels: Record<string, string> = {
+    protanopia: 'Protanopia',
+    deuteranopia: 'Deuteranopia',
+    tritanopia: 'Tritanopia',
+  };
+  const simLabel = cvdLabels[cvdType as string] ?? 'Simulated';
+
+  const isContinuous = scaleType === 'sequential';
+
+  // Layout constants
+  const labelW = 90;
+  const barH = 20;
+  const rowGap = 6;
+  const paddingX = 8;
+  const paddingY = 6;
+  const barW = isContinuous ? 260 : originalColors.length * 26 - 2;
+
+  const svgW = labelW + barW + paddingX * 2;
+  const svgH = 2 * barH + rowGap + paddingY * 2;
+  const normalY = paddingY;
+  const simY = paddingY + barH + rowGap;
+  const textStyle = 'font-family:system-ui,sans-serif;font-size:11px;fill:#333';
+  const barX = labelW + paddingX;
+
+  let defs = '';
+  let normalBar = '';
+  let simBar = '';
+
+  if (isContinuous) {
+    // Build gradient stops from the color arrays
+    const gradientStops = (colors: string[], id: string): string => {
+      const stops = colors
+        .map((color, i) => {
+          const offset = colors.length === 1 ? 50 : Math.round((i / (colors.length - 1)) * 100);
+          return `<stop offset="${offset}%" stop-color="${color}"/>`;
+        })
+        .join('');
+      return `<linearGradient id="${id}">${stops}</linearGradient>`;
+    };
+
+    defs = [
+      '<defs>',
+      gradientStops(originalColors, 'origGrad'),
+      gradientStops(simulatedColors, 'simGrad'),
+      '</defs>',
+    ].join('');
+
+    normalBar = `<rect x="${barX}" y="${normalY}" width="${barW}" height="${barH}" fill="url(#origGrad)" rx="2"/>`;
+    simBar = `<rect x="${barX}" y="${simY}" width="${barW}" height="${barH}" fill="url(#simGrad)" rx="2"/>`;
+  } else {
+    // Discrete swatches for categorical scales
+    const swatchW = 24;
+    const gap = 2;
+
+    const swatchRow = (colors: string[], y: number): string =>
+      colors
+        .map((color, i) => {
+          const x = barX + i * (swatchW + gap);
+          return `<rect x="${x}" y="${y}" width="${swatchW}" height="${barH}" fill="${color}" rx="2"/>`;
+        })
+        .join('');
+
+    normalBar = swatchRow(originalColors, normalY);
+    simBar = swatchRow(simulatedColors, simY);
+  }
+
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`,
+    `<rect width="${svgW}" height="${svgH}" fill="#fff" rx="4"/>`,
+    defs,
+    `<text x="${paddingX}" y="${normalY + 14}" style="${textStyle}">Normal</text>`,
+    normalBar,
+    `<text x="${paddingX}" y="${simY + 14}" style="${textStyle}">${simLabel}</text>`,
+    simBar,
+    `</svg>`,
+  ].join('');
+
+  return `![CVD preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
+}
+
 function toIssueDecorations(
   issues: AccessibilityIssue[],
   editor: Monaco.editor.IStandaloneCodeEditor | null,
@@ -57,6 +157,19 @@ function toIssueDecorations(
     const start = model.getPositionAt(node.offset);
     const end = model.getPositionAt(node.offset + node.length);
 
+    // Build the hover content — add CVD swatch preview when available
+    const preview = buildCvdPreviewSvg(issue);
+    const hoverParts = [
+      `**Accessibility** (${issue.severity})`,
+      '',
+      issue.message,
+      '',
+      `Suggestion: ${issue.suggestion}`,
+    ];
+    if (preview) {
+      hoverParts.push('', preview);
+    }
+
     decorations.push({
       range: {
         startLineNumber: start.lineNumber,
@@ -69,7 +182,9 @@ function toIssueDecorations(
         inlineClassName: 'a11yInlineDecoration',
         stickiness: 1,
         hoverMessage: {
-          value: `**Accessibility** (${issue.severity})\n\n${issue.message}\n\nSuggestion: ${issue.suggestion}`,
+          value: hoverParts.join('\n'),
+          supportHtml: true,
+          isTrusted: true,
         },
       },
     });
@@ -110,7 +225,6 @@ function toIssueMarkers(
     markers.push({
       startLineNumber: start.lineNumber,
       startColumn: start.column,
-      //Monaco always shows marker messages on hover, so to supress them and display clearer warning we give it 0 width
       endLineNumber: start.lineNumber,
       endColumn: start.column,
       severity: monaco.MarkerSeverity.Warning,

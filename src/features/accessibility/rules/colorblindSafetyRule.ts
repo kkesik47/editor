@@ -64,15 +64,24 @@ function buildIssues(
         ? 'color pairs'
         : 'distant data values';
 
+    // Describe severity based on how close the colors became
+    let impact: string;
+    if (result.minDeltaE < 1) {
+      impact = 'become identical';
+    } else if (result.minDeltaE < 3) {
+      impact = 'become nearly identical';
+    } else {
+      impact = 'become hard to distinguish';
+    }
+
     return {
       ruleId: `vl-a11y-colorblind-safety:${result.cvdType}`,
       severity: 'warning',
 
       message:
         `Under ${label} simulation, some ${pairKind} in the ` +
-        `'${scale.channel}' scale${schemeNote} become nearly ` +
-        `indistinguishable (min ΔE = ${result.minDeltaE}, ` +
-        `threshold = ${threshold}).`,
+        `'${scale.channel}' scale${schemeNote} ${impact} ` +
+        `(min ΔE = ${result.minDeltaE}, threshold = ${threshold}).`,
 
       suggestion:
         scale.scaleType === 'categorical'
@@ -91,6 +100,8 @@ function buildIssues(
         minDeltaE: result.minDeltaE,
         threshold,
         resolvedColorCount: scale.colors.length,
+        originalColors: result.originalColors,
+        simulatedColors: result.simulatedColors,
         problematicPairs: result.problematicPairs.map((pair) => ({
           originalA: pair.originalA,
           originalB: pair.originalB,

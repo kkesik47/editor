@@ -77,6 +77,10 @@ export interface CvdTestResult {
   minDeltaE: number;
   /** All pairs that fell below the distinguishability threshold. */
   problematicPairs: ProblematicPair[];
+  /** The original CSS color strings that were tested. */
+  originalColors: string[];
+  /** The simulated colors (hex) after applying CVD transformation. */
+  simulatedColors: string[];
 }
 
 // ─── Configuration ───────────────────────────────────────────────
@@ -242,10 +246,15 @@ function testOneCvdType(
     }
   }
 
+  // Convert simulated colors to hex strings for the preview.
+  const simulatedHex = simulated.map((c) => (c ? formatHex(c) ?? '#000000' : '#000000'));
+
   return {
     cvdType,
     minDeltaE: minDeltaE === Infinity ? 0 : round2(minDeltaE),
     problematicPairs,
+    originalColors: colors,
+    simulatedColors: simulatedHex,
   };
 }
 
