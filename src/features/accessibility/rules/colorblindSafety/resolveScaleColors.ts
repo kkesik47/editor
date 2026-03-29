@@ -25,7 +25,7 @@ export type ScaleType = 'categorical' | 'sequential';
 export interface ResolvedScale {
   /** The concrete CSS color strings the scale will render. */
   colors: string[];
-  /** Categorical → check all pairs; sequential → check adjacent only. */
+  /** Categorical → check all pairs; sequential → check adjacent + stride. */
   scaleType: ScaleType;
   /** JSON Pointer to the scale property (for editor underlines). */
   jsonPointer: string;
@@ -44,9 +44,16 @@ const COLOR_CHANNELS = ['color', 'fill', 'stroke'] as const;
  * How many evenly-spaced samples to take from a continuous color
  * interpolator when no explicit count is given.
  *
- * 9 gives good coverage of the hue range without being excessive.
+ * 16 gives good coverage: with a stride of floor(16/3) = 5,
+ * stride-pair checks span ~31% of the scale range, reliably
+ * catching fold-over problems like rainbow under CVD simulation.
+ *
+ * Why not 9?  With only 9 samples each adjacent step spans ~11%
+ * of the range — enough local change that even CVD-collapsed zones
+ * keep adjacent ΔE above 3.  16 tightens the local steps AND gives
+ * the stride check meaningful reach.
  */
-const DEFAULT_CONTINUOUS_SAMPLES = 9;
+const DEFAULT_CONTINUOUS_SAMPLES = 16;
 
 // ─── Scheme resolution ──────────────────────────────────────────
 

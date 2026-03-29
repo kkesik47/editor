@@ -37,6 +37,48 @@ describe('colorblindSafetyRule', () => {
     expect(issues).toHaveLength(0);
   });
 
+  it('passes plasma (known CVD-safe)', () => {
+    const spec = {
+      encoding: {
+        color: {
+          field: 'value',
+          type: 'quantitative',
+          scale: {scheme: 'plasma'},
+        },
+      },
+    };
+    const issues = colorblindSafetyRule.evaluate(spec);
+    expect(issues).toHaveLength(0);
+  });
+
+  it('passes inferno (known CVD-safe)', () => {
+    const spec = {
+      encoding: {
+        color: {
+          field: 'value',
+          type: 'quantitative',
+          scale: {scheme: 'inferno'},
+        },
+      },
+    };
+    const issues = colorblindSafetyRule.evaluate(spec);
+    expect(issues).toHaveLength(0);
+  });
+
+  it('passes magma (known CVD-safe)', () => {
+    const spec = {
+      encoding: {
+        color: {
+          field: 'value',
+          type: 'quantitative',
+          scale: {scheme: 'magma'},
+        },
+      },
+    };
+    const issues = colorblindSafetyRule.evaluate(spec);
+    expect(issues).toHaveLength(0);
+  });
+
   it('passes an empty spec with no encoding', () => {
     const issues = colorblindSafetyRule.evaluate({});
     expect(issues).toHaveLength(0);
@@ -74,7 +116,7 @@ describe('colorblindSafetyRule', () => {
     expect(hasRedGreenDeficiency).toBe(true);
   });
 
-  it('flags a rainbow scheme (not colorblind-safe)', () => {
+  it('flags a rainbow scheme (fold-over under CVD)', () => {
     const spec = {
       encoding: {
         color: {
@@ -86,6 +128,13 @@ describe('colorblindSafetyRule', () => {
     };
     const issues = colorblindSafetyRule.evaluate(spec);
     expect(issues.length).toBeGreaterThan(0);
+
+    // Rainbow should fail under protanopia or deuteranopia because
+    // the green zone and the red zone fold onto the same simulated color
+    const cvdTypes = issues.map((issue) => issue.evidence.cvdType);
+    const hasRedGreenDeficiency =
+      cvdTypes.includes('protanopia') || cvdTypes.includes('deuteranopia');
+    expect(hasRedGreenDeficiency).toBe(true);
   });
 
   // ─── Scheme object syntax ───────────────────────────────────
@@ -172,9 +221,9 @@ describe('colorblindSafetyRule', () => {
     expect(issue.evidence.problematicPairs).toBeInstanceOf(Array);
   });
 
-  // ─── Sequential vs categorical comparison strategy ──────────
+  // ─── Stride pairs catch fold-over ───────────────────────────
 
-  it('uses adjacent-only comparison for quantitative fields', () => {
+  it('rainbow stride pairs include non-adjacent indices', () => {
     const spec = {
       encoding: {
         color: {
@@ -185,12 +234,15 @@ describe('colorblindSafetyRule', () => {
       },
     };
     const issues = colorblindSafetyRule.evaluate(spec);
+    expect(issues.length).toBeGreaterThan(0);
 
-    // All problematic pairs should be adjacent (indexB = indexA + 1)
-    for (const issue of issues) {
-      for (const pair of issue.evidence.problematicPairs as any[]) {
-        expect(pair.indexB - pair.indexA).toBe(1);
-      }
-    }
+    // At least one problematic pair should be a stride pair (indexB - indexA > 1)
+    const allPairs = issues.flatMap(
+      (issue) => issue.evidence.problematicPairs as any[],
+    );
+    const hasStridePair = allPairs.some(
+      (pair) => pair.indexB - pair.indexA > 1,
+    );
+    expect(hasStridePair).toBe(true);
   });
 });

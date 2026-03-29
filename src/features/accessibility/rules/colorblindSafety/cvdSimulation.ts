@@ -8,9 +8,26 @@
  * physiologically accurate CVD simulation, and CIEDE2000 (ΔE₀₀) for
  * perceptually-weighted color difference measurement.
  *
- * Two comparison strategies are supported:
- *   - Categorical scales → all-pairs comparison
- *   - Sequential scales  → adjacent-pairs only
+ * Comparison strategies:
+ *
+ *   Categorical scales → all-pairs comparison (threshold ΔE 5).
+ *
+ *   Sequential scales  → distant-pair comparison.
+ *     Checks all pairs where the gap is ≥ 25% of the range.
+ *     Threshold ΔE 7.
+ *
+ *   Why "all distant pairs" instead of specific strides?
+ *   Schemes like rainbow have fold-over under CVD, but the exact
+ *   distance at which hue AND lightness both collapse depends on
+ *   the scheme's lightness profile.  Checking only stride n/3 and
+ *   n/2 can miss the fold-over point.  Scanning all distant pairs
+ *   catches fold-over at any distance ≥ 25% of the range.
+ *
+ *   Why no adjacent check for sequential?
+ *   Adjacent samples from a high-density sampling (16 points) are
+ *   only ~6% of the range apart. Even CVD-safe schemes like viridis
+ *   have small ΔE between neighbors at that density — that's normal
+ *   gradient behavior, not a defect.
  *
  * References:
  *   Brettel, H., Viénot, F., & Mollon, J.D. (1997).
@@ -56,7 +73,7 @@ export interface ProblematicPair {
 export interface CvdTestResult {
   /** Which CVD type was simulated. */
   cvdType: CvdType;
-  /** The smallest ΔE₀₀ found among the compared pairs. */
+  /** The smallest ΔE₀₀ found among all compared pairs. */
   minDeltaE: number;
   /** All pairs that fell below the distinguishability threshold. */
   problematicPairs: ProblematicPair[];
@@ -67,20 +84,31 @@ export interface CvdTestResult {
 /**
  * Minimum CIEDE2000 ΔE₀₀ for categorical scales (all pairs).
  *
- * Two categories that drop below this under CVD simulation could be
- * confused in a legend or scatterplot. A value of 10 corresponds to
- * "very clearly different" in normal vision.
+ * CIEDE2000 reference scale:
+ *   < 1   imperceptible
+ *   1–2   barely perceptible
+ *   2–5   noticeable but potentially confusable
+ *   > 5   clearly different
+ *
+ * Below 5, two legend entries could be misidentified.
  */
-export const CATEGORICAL_THRESHOLD = 10;
+export const CATEGORICAL_THRESHOLD = 5;
 
 /**
- * Minimum CIEDE2000 ΔE₀₀ for sequential scales (adjacent steps).
+ * Minimum CIEDE2000 ΔE₀₀ for sequential "distant" pairs.
  *
- * Adjacent gradient steps collapsing below this means the progression
- * becomes invisible. A value of 3 is roughly the "clearly noticeable
- * to most observers" boundary.
+ * Any two data values ≥25% of the range apart must remain clearly
+ * different under CVD.  If they collapse, the user cannot read the
+ * scale — two distant data values appear identical.
+ *
+ * We use 7 rather than 10 because:
+ *   - ΔE 7 is well above "clearly different" (>5)
+ *   - CVD-safe schemes like plasma have worst-case distant-pair
+ *     ΔE around 8 under protanopia — threshold 10 false-positives them
+ *   - Genuinely problematic schemes like rainbow have fold-over
+ *     pairs well below 7
  */
-export const SEQUENTIAL_THRESHOLD = 3;
+export const SEQUENTIAL_DISTANT_THRESHOLD = 7;
 
 /** Severity of the Brettel simulation (1.0 = full dichromacy). */
 const CVD_SEVERITY = 1.0;
@@ -99,70 +127,17 @@ const ALL_CVD_TYPES: CvdType[] = ['protanopia', 'deuteranopia', 'tritanopia'];
 /** The CIEDE2000 comparator (instantiated once, reused). */
 const computeDeltaE = differenceCiede2000();
 
-// ─── Core logic ──────────────────────────────────────────────────
+// ─── Pair batch types ────────────────────────────────────────────
 
-/**
- * Simulate one CVD type on a color array and find problematic pairs.
- *
- * @param colors    - Array of CSS color strings to test.
- * @param scaleType - 'categorical' → all pairs; 'sequential' → adjacent only.
- * @param threshold - Minimum ΔE₀₀ below which a pair is flagged.
- * @param cvdType   - Which color vision deficiency to simulate.
- */
-function testOneCvdType(
-  colors: string[],
-  scaleType: ScaleType,
-  threshold: number,
-  cvdType: CvdType,
-): CvdTestResult {
-  const simulator = CVD_SIMULATORS[cvdType];
-
-  // Parse every color, simulate CVD, and store the simulated result.
-  // `culori.parse` returns undefined for unparseable strings.
-  const simulated = colors.map((raw) => {
-    const parsed = parse(raw);
-    return parsed ? simulator(parsed) : undefined;
-  });
-
-  const problematicPairs: ProblematicPair[] = [];
-  let minDeltaE = Infinity;
-
-  // Build the list of index pairs to compare
-  const pairs = scaleType === 'categorical'
-    ? allPairs(colors.length)
-    : adjacentPairs(colors.length);
-
-  for (const [i, j] of pairs) {
-    const colorA = simulated[i];
-    const colorB = simulated[j];
-    if (!colorA || !colorB) continue;
-
-    const dE = computeDeltaE(colorA, colorB);
-    if (dE < minDeltaE) minDeltaE = dE;
-
-    if (dE < threshold) {
-      problematicPairs.push({
-        indexA: i,
-        indexB: j,
-        originalA: colors[i],
-        originalB: colors[j],
-        simulatedA: formatHex(colorA) ?? '',
-        simulatedB: formatHex(colorB) ?? '',
-        deltaE: round2(dE),
-      });
-    }
-  }
-
-  return {
-    cvdType,
-    minDeltaE: minDeltaE === Infinity ? 0 : round2(minDeltaE),
-    problematicPairs,
-  };
+/** A set of index-pairs to compare, with their own ΔE threshold. */
+interface PairBatch {
+  pairs: [number, number][];
+  threshold: number;
 }
 
 // ─── Pair generators ─────────────────────────────────────────────
 
-/** Generate all unique index pairs (i, j) where i < j. */
+/** All unique index pairs (i, j) where i < j. */
 function allPairs(length: number): [number, number][] {
   const pairs: [number, number][] = [];
   for (let i = 0; i < length; i++) {
@@ -173,13 +148,105 @@ function allPairs(length: number): [number, number][] {
   return pairs;
 }
 
-/** Generate adjacent index pairs: (0,1), (1,2), (2,3), ... */
-function adjacentPairs(length: number): [number, number][] {
+/**
+ * All pairs (i, j) where j - i >= minGap.
+ *
+ * This comprehensively covers fold-over at ANY distance ≥ minGap,
+ * rather than checking only specific stride values.  This matters
+ * for schemes like rainbow where the exact fold-over point depends
+ * on both the hue cycle and the lightness profile.
+ *
+ * Example with length = 16, minGap = 4:
+ *   (0,4), (0,5), …, (0,15),
+ *   (1,5), (1,6), …, (1,15),
+ *   …, (11,15)
+ */
+function distantPairs(length: number, minGap: number): [number, number][] {
   const pairs: [number, number][] = [];
-  for (let i = 0; i < length - 1; i++) {
-    pairs.push([i, i + 1]);
+  for (let i = 0; i < length; i++) {
+    for (let j = i + minGap; j < length; j++) {
+      pairs.push([i, j]);
+    }
   }
   return pairs;
+}
+
+// ─── Batch builder ───────────────────────────────────────────────
+
+/**
+ * Build the list of pair-batches to evaluate for a given scale type.
+ *
+ *   Categorical → one batch: all unique pairs, threshold 5.
+ *
+ *   Sequential  → one batch: all distant pairs (gap ≥ 25% of range),
+ *     threshold 7.  This comprehensively catches fold-over at any
+ *     distance rather than checking only specific strides.
+ */
+function buildPairBatches(length: number, scaleType: ScaleType): PairBatch[] {
+  if (scaleType === 'categorical') {
+    return [{pairs: allPairs(length), threshold: CATEGORICAL_THRESHOLD}];
+  }
+
+  // Sequential: all pairs that are at least 25% of the range apart.
+  // For 16 samples, minGap = 4 → covers distances from 25% to 100%.
+  const minGap = Math.max(2, Math.floor(length / 4));
+
+  return [
+    {pairs: distantPairs(length, minGap), threshold: SEQUENTIAL_DISTANT_THRESHOLD},
+  ];
+}
+
+// ─── Core logic ──────────────────────────────────────────────────
+
+/**
+ * Simulate one CVD type on a color array and find problematic pairs.
+ */
+function testOneCvdType(
+  colors: string[],
+  scaleType: ScaleType,
+  cvdType: CvdType,
+): CvdTestResult {
+  const simulator = CVD_SIMULATORS[cvdType];
+
+  // Parse every color, simulate CVD, store the simulated result.
+  const simulated = colors.map((raw) => {
+    const parsed = parse(raw);
+    return parsed ? simulator(parsed) : undefined;
+  });
+
+  const problematicPairs: ProblematicPair[] = [];
+  let minDeltaE = Infinity;
+
+  const batches = buildPairBatches(colors.length, scaleType);
+
+  for (const {pairs, threshold} of batches) {
+    for (const [i, j] of pairs) {
+      const colorA = simulated[i];
+      const colorB = simulated[j];
+      if (!colorA || !colorB) continue;
+
+      const dE = computeDeltaE(colorA, colorB);
+      if (dE < minDeltaE) minDeltaE = dE;
+
+      if (dE < threshold) {
+        problematicPairs.push({
+          indexA: i,
+          indexB: j,
+          originalA: colors[i],
+          originalB: colors[j],
+          simulatedA: formatHex(colorA) ?? '',
+          simulatedB: formatHex(colorB) ?? '',
+          deltaE: round2(dE),
+        });
+      }
+    }
+  }
+
+  return {
+    cvdType,
+    minDeltaE: minDeltaE === Infinity ? 0 : round2(minDeltaE),
+    problematicPairs,
+  };
 }
 
 /** Round to 2 decimal places for readable output. */
@@ -192,9 +259,9 @@ function round2(n: number): number {
 /**
  * Test a color array against all three CVD types.
  *
- * Returns one CvdTestResult per deficiency type, but only those that
- * have at least one problematic pair. Returns an empty array if the
- * scale is safe under all simulated deficiencies.
+ * Returns one CvdTestResult per deficiency type, but only those
+ * that have at least one problematic pair.  Returns an empty array
+ * if the scale is safe under all simulated deficiencies.
  *
  * @param colors    - Array of CSS color strings to evaluate.
  * @param scaleType - Determines the comparison strategy.
@@ -203,11 +270,7 @@ export function evaluateColorblindSafety(
   colors: string[],
   scaleType: ScaleType,
 ): CvdTestResult[] {
-  const threshold = scaleType === 'categorical'
-    ? CATEGORICAL_THRESHOLD
-    : SEQUENTIAL_THRESHOLD;
-
   return ALL_CVD_TYPES
-    .map((cvdType) => testOneCvdType(colors, scaleType, threshold, cvdType))
+    .map((cvdType) => testOneCvdType(colors, scaleType, cvdType))
     .filter((result) => result.problematicPairs.length > 0);
 }

@@ -27,7 +27,7 @@ import {
   evaluateColorblindSafety,
   type CvdTestResult,
   CATEGORICAL_THRESHOLD,
-  SEQUENTIAL_THRESHOLD,
+  SEQUENTIAL_DISTANT_THRESHOLD,
 } from './colorblindSafety/cvdSimulation.js';
 
 // ─── Human-readable names for CVD types ──────────────────────────
@@ -51,13 +51,18 @@ function buildIssues(
   return cvdResults.map((result) => {
     const label = CVD_LABELS[result.cvdType] ?? result.cvdType;
     const threshold =
-      scale.scaleType === 'categorical' ? CATEGORICAL_THRESHOLD : SEQUENTIAL_THRESHOLD;
-    const pairKind =
-      scale.scaleType === 'categorical' ? 'color pairs' : 'adjacent color steps';
+      scale.scaleType === 'categorical'
+        ? CATEGORICAL_THRESHOLD
+        : SEQUENTIAL_DISTANT_THRESHOLD;
 
     const schemeNote = scale.schemeName
       ? ` (scheme '${scale.schemeName}')`
       : '';
+
+    const pairKind =
+      scale.scaleType === 'categorical'
+        ? 'color pairs'
+        : 'distant data values';
 
     return {
       ruleId: `vl-a11y-colorblind-safety:${result.cvdType}`,
