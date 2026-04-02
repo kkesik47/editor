@@ -41,11 +41,7 @@ function jsonPointerToPath(pointer: string): (string | number)[] {
  */
 function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
   const {originalColors, simulatedColors, cvdType, scaleType} = issue.evidence ?? {};
-  if (
-    !Array.isArray(originalColors) ||
-    !Array.isArray(simulatedColors) ||
-    originalColors.length === 0
-  ) {
+  if (!Array.isArray(originalColors) || !Array.isArray(simulatedColors) || originalColors.length === 0) {
     return '';
   }
 
@@ -225,6 +221,7 @@ function toIssueMarkers(
     markers.push({
       startLineNumber: start.lineNumber,
       startColumn: start.column,
+      //Monaco always shows marker messages on hover, so to supress them and display clearer warning we give it 0 width
       endLineNumber: start.lineNumber,
       endColumn: start.column,
       severity: monaco.MarkerSeverity.Warning,
@@ -250,7 +247,8 @@ const EditorWithNavigation: React.FC<{
   updateVegaSpec: (spec: string, config?: string) => void;
 }> = (props) => {
   const {state} = useAppContext();
-  const {mode, editorString, decorations, manualParse, parse, sidePaneItem, configEditorString, accessibilityIssues} = state;
+  const {mode, editorString, decorations, manualParse, parse, sidePaneItem, configEditorString, accessibilityIssues} =
+    state;
 
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<MonacoModule | null>(null);

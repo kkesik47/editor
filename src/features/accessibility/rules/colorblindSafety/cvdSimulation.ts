@@ -283,3 +283,22 @@ export function evaluateColorblindSafety(
     .map((cvdType) => testOneCvdType(colors, scaleType, cvdType))
     .filter((result) => result.problematicPairs.length > 0);
 }
+
+/**
+ * Simulate a single CVD type on an array of CSS color strings.
+ *
+ * Returns the simulated colors as hex strings, in the same order.
+ * Useful for generating color previews without the full pair analysis.
+ *
+ * @param colors  - Array of CSS color strings to simulate.
+ * @param cvdType - Which CVD type to simulate.
+ */
+export function simulateCvdColors(colors: string[], cvdType: CvdType): string[] {
+  const simulator = CVD_SIMULATORS[cvdType];
+  return colors.map((raw) => {
+    const parsed = parse(raw);
+    if (!parsed) return '#000000';
+    const simulated = simulator(parsed);
+    return formatHex(simulated) ?? '#000000';
+  });
+}
