@@ -30,31 +30,27 @@ function jsonPointerToPath(pointer: string): (string | number)[] {
     });
 }
 
+// ─── Color preview SVG builders ──────────────────────────────────
+
 /**
- * Build an inline SVG showing "Normal" and "Simulated" color previews.
+ * Shared SVG builder for "Normal vs X" color previews.
  *
- * Sequential scales → smooth linear gradient (matches chart legend).
- * Categorical scales → discrete color swatches.
+ * Both CVD simulation and grayscale previews follow the same layout:
+ * two rows of color swatches (or gradients) with labels.
+ * This function extracts the common rendering logic.
  *
- * Returns an encoded data URI string for embedding in Markdown, or
- * an empty string if the issue has no color preview data.
+ * @param originalColors  - The original CSS colors from the scale.
+ * @param transformedColors - The simulated/grayscale CSS colors.
+ * @param transformLabel  - Label for the second row (e.g. "Protanopia", "Grayscale").
+ * @param isContinuous    - Whether to render a smooth gradient or discrete swatches.
+ * @returns An encoded SVG data URI string for embedding in Markdown.
  */
-function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
-  const {originalColors, simulatedColors, cvdType, scaleType} = issue.evidence ?? {};
-  if (!Array.isArray(originalColors) || !Array.isArray(simulatedColors) || originalColors.length === 0) {
-    return '';
-  }
-
-  // Human-readable CVD label
-  const cvdLabels: Record<string, string> = {
-    protanopia: 'Protanopia',
-    deuteranopia: 'Deuteranopia',
-    tritanopia: 'Tritanopia',
-  };
-  const simLabel = cvdLabels[cvdType as string] ?? 'Simulated';
-
-  const isContinuous = scaleType === 'sequential';
-
+function buildColorPreviewSvg(
+  originalColors: string[],
+  transformedColors: string[],
+  transformLabel: string,
+  isContinuous: boolean,
+): string {
   // Layout constants
   const labelW = 90;
   const barH = 20;
@@ -89,7 +85,7 @@ function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
     defs = [
       '<defs>',
       gradientStops(originalColors, 'origGrad'),
-      gradientStops(simulatedColors, 'simGrad'),
+      gradientStops(transformedColors, 'simGrad'),
       '</defs>',
     ].join('');
 
@@ -109,7 +105,7 @@ function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
         .join('');
 
     normalBar = swatchRow(originalColors, normalY);
-    simBar = swatchRow(simulatedColors, simY);
+    simBar = swatchRow(transformedColors, simY);
   }
 
   const svg = [
@@ -118,13 +114,55 @@ function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
     defs,
     `<text x="${paddingX}" y="${normalY + 14}" style="${textStyle}">Normal</text>`,
     normalBar,
-    `<text x="${paddingX}" y="${simY + 14}" style="${textStyle}">${simLabel}</text>`,
+    `<text x="${paddingX}" y="${simY + 14}" style="${textStyle}">${transformLabel}</text>`,
     simBar,
     `</svg>`,
   ].join('');
 
-  return `![CVD preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
+  return `![Color preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
 }
+
+/**
+ * Build an inline SVG showing "Normal" and "Simulated (CVD type)" color previews.
+ *
+ * Returns an encoded data URI string for embedding in Markdown, or
+ * an empty string if the issue has no CVD preview data.
+ */
+function buildCvdPreviewSvg(issue: AccessibilityIssue): string {
+  const {originalColors, simulatedColors, cvdType, scaleType} = issue.evidence ?? {};
+  if (!Array.isArray(originalColors) || !Array.isArray(simulatedColors) || originalColors.length === 0) {
+    return '';
+  }
+
+  const cvdLabels: Record<string, string> = {
+    protanopia: 'Protanopia',
+    deuteranopia: 'Deuteranopia',
+    tritanopia: 'Tritanopia',
+  };
+  const simLabel = cvdLabels[cvdType as string] ?? 'Simulated';
+  const isContinuous = scaleType === 'sequential';
+
+  return buildColorPreviewSvg(originalColors as string[], simulatedColors as string[], simLabel, isContinuous);
+}
+
+/**
+ * Build an inline SVG showing "Normal" and "Grayscale" color previews.
+ *
+ * Returns an encoded data URI string for embedding in Markdown, or
+ * an empty string if the issue has no grayscale preview data.
+ */
+function buildGrayscalePreviewSvg(issue: AccessibilityIssue): string {
+  const {originalColors, grayscaleColors, scaleType} = issue.evidence ?? {};
+  if (!Array.isArray(originalColors) || !Array.isArray(grayscaleColors) || originalColors.length === 0) {
+    return '';
+  }
+
+  const isContinuous = scaleType === 'sequential';
+
+  return buildColorPreviewSvg(originalColors as string[], grayscaleColors as string[], 'Grayscale', isContinuous);
+}
+
+// ─── Issue → decoration / marker conversion ─────────────────────
 
 function toIssueDecorations(
   issues: AccessibilityIssue[],
@@ -153,8 +191,10 @@ function toIssueDecorations(
     const start = model.getPositionAt(node.offset);
     const end = model.getPositionAt(node.offset + node.length);
 
-    // Build the hover content — add CVD swatch preview when available
-    const preview = buildCvdPreviewSvg(issue);
+    // Build the hover content — add color preview when available
+    const cvdPreview = buildCvdPreviewSvg(issue);
+    const grayscalePreview = buildGrayscalePreviewSvg(issue);
+
     const hoverParts = [
       `**Accessibility** (${issue.severity})`,
       '',
@@ -162,8 +202,11 @@ function toIssueDecorations(
       '',
       `Suggestion: ${issue.suggestion}`,
     ];
-    if (preview) {
-      hoverParts.push('', preview);
+    if (cvdPreview) {
+      hoverParts.push('', cvdPreview);
+    }
+    if (grayscalePreview) {
+      hoverParts.push('', grayscalePreview);
     }
 
     decorations.push({
@@ -231,6 +274,8 @@ function toIssueMarkers(
   }
   return markers;
 }
+
+// ─── Editor component ────────────────────────────────────────────
 
 const EditorWithNavigation: React.FC<{
   clearConfig: () => void;

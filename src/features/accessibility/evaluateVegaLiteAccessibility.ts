@@ -1,12 +1,12 @@
 import {AccessibilityIssue, AccessibilityRule} from './types.js';
 import {colorRiskRule} from './rules/colorRiskRule.js';
 import {colorblindSafetyRule} from './rules/colorblindSafetyRule.js';
-import {simulateCvdColors} from './rules/colorblindSafety/cvdSimulation.js';
-import type {CvdType} from './rules/colorblindSafety/cvdSimulation.js';
+import {lightnessContrastRule} from './rules/lightnessContrastRule.js';
 
 const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [
   colorRiskRule,
   colorblindSafetyRule,
+  lightnessContrastRule,
 ];
 
 /**
@@ -45,64 +45,12 @@ function deduplicateColorIssues(issues: AccessibilityIssue[]): AccessibilityIssu
   });
 }
 
-/**
- * Enrich colorRiskRule issues with CVD simulation preview data.
- *
- * The colorRiskRule detects risky color-family combinations (e.g.
- * red + green) but doesn't simulate CVD. This function extracts
- * the matched colors from its evidence, runs them through the CVD
- * simulator, and attaches the original/simulated color arrays so
- * the renderer can show a visual preview in the hover tooltip.
- */
-function enrichWithCvdPreview(issues: AccessibilityIssue[]): AccessibilityIssue[] {
-  return issues.map((issue) => {
-    // Only enrich color-risk issues that don't already have preview data
-    if (!issue.ruleId.startsWith('vl-a11y-color-risk-rules')) return issue;
-    if (issue.evidence?.originalColors) return issue;
-
-    const matchedColors = issue.evidence?.matchedColors as Array<{value: string}> | undefined;
-    const cvdTypes = issue.evidence?.cvdTypes as string[] | undefined;
-
-    if (!matchedColors || matchedColors.length === 0 || !cvdTypes || cvdTypes.length === 0) {
-      return issue;
-    }
-
-    // Extract unique color values (preserving order)
-    const seen = new Set<string>();
-    const colors: string[] = [];
-    for (const entry of matchedColors) {
-      if (!seen.has(entry.value)) {
-        seen.add(entry.value);
-        colors.push(entry.value);
-      }
-    }
-
-    if (colors.length === 0) return issue;
-
-    // Simulate using the first (most relevant) CVD type
-    const cvdType = cvdTypes[0] as CvdType;
-    const simulatedColors = simulateCvdColors(colors, cvdType);
-
-    return {
-      ...issue,
-      evidence: {
-        ...issue.evidence,
-        originalColors: colors,
-        simulatedColors,
-        cvdType,
-        scaleType: 'categorical',
-      },
-    };
-  });
-}
-
 export function evaluateVegaLiteAccessibility(
   spec: Record<string, any>,
   rules: AccessibilityRule[] = DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES,
 ): AccessibilityIssue[] {
   const allIssues = rules.flatMap((rule) => rule.evaluate(spec));
-  const deduplicated = deduplicateColorIssues(allIssues);
-  return enrichWithCvdPreview(deduplicated);
+  return deduplicateColorIssues(allIssues);
 }
 
 export {DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES};
