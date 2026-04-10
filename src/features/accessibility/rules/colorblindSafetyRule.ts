@@ -29,6 +29,7 @@ import {
   CATEGORICAL_THRESHOLD,
   SEQUENTIAL_DISTANT_THRESHOLD,
 } from './colorblindSafety/cvdSimulation.js';
+import { debugCvdDeltaE } from './colorblindSafety/cvdSimulation.js';
 
 // ─── Human-readable names for CVD types ──────────────────────────
 
@@ -134,6 +135,9 @@ export const colorblindSafetyRule: AccessibilityRule = {
     const issues: AccessibilityIssue[] = [];
 
     for (const scale of scales) {
+      console.log('[CVD debug] scale:', scale.channel, scale.colors);
+      debugCvdDeltaE(scale.colors, scale.scaleType);
+      
       const cvdResults = evaluateColorblindSafety(scale.colors, scale.scaleType);
 
       // Step 3: Convert problematic results into AccessibilityIssue objects

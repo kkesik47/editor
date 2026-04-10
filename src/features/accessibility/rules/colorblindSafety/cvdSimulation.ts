@@ -302,3 +302,11 @@ export function simulateCvdColors(colors: string[], cvdType: CvdType): string[] 
     return formatHex(simulated) ?? '#000000';
   });
 }
+
+/** Debug helper — returns min ΔE for each CVD type WITHOUT filtering. */
+export function debugCvdDeltaE(colors: string[], scaleType: ScaleType): void {
+  for (const cvdType of ALL_CVD_TYPES) {
+    const result = testOneCvdType(colors, scaleType, cvdType);
+    console.log(`[CVD ΔE] ${cvdType}: minΔE=${result.minDeltaE}, pairs=${result.problematicPairs.length}, threshold=${scaleType === 'categorical' ? CATEGORICAL_THRESHOLD : SEQUENTIAL_DISTANT_THRESHOLD}`);
+  }
+}

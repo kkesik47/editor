@@ -16,7 +16,10 @@
         "saturationMin": 0.35,
         "lightnessMin": 0.2,
         "lightnessMax": 0.8,
-        "hueRanges": [[0, 20], [340, 360]]
+        "hueRanges": [
+          [0, 20],
+          [340, 360]
+        ]
       }
     },
     {
@@ -78,7 +81,10 @@
       "thresholds": {
         "saturationMin": 0.22,
         "lightnessMin": 0.58,
-        "hueRanges": [[310, 350], [0, 12]]
+        "hueRanges": [
+          [310, 350],
+          [0, 12]
+        ]
       }
     },
     {
@@ -143,16 +149,6 @@
       "suggestion": "Use distinct hue families plus texture or symbols for robust differentiation.",
       "cvdTypes": ["protanopia", "deuteranopia"],
       "rationale": "This triad combines multiple warm/earth tones often reported as hard to separate."
-    },
-    {
-      "id": "pink-turquoise-gray",
-      "label": "Pink/Turquoise/Gray low-salience mix",
-      "families": ["pink", "turquoise", "gray"],
-      "severity": "info",
-      "message": "Pink, turquoise, and gray together may produce low-salience distinctions for some audiences.",
-      "suggestion": "Increase contrast and add labels or shape channels for critical comparisons.",
-      "cvdTypes": ["tritanopia", "achromatopsia"],
-      "notes": "Useful as a conservative warning in pastel-themed dashboards."
     },
     {
       "id": "green-black",
