@@ -180,7 +180,7 @@ function toIssueDecorations(
 
   const decorations: Monaco.editor.IModelDeltaDecoration[] = [];
   for (const issue of issues) {
-    if (!issue.jsonPointer) {
+    if (issue.jsonPointer == null) {
       continue;
     }
     const path = jsonPointerToPath(issue.jsonPointer);
@@ -188,6 +188,7 @@ function toIssueDecorations(
     if (!node) {
       continue;
     }
+
     const start = model.getPositionAt(node.offset);
     const end = model.getPositionAt(node.offset + node.length);
 
@@ -249,7 +250,7 @@ function toIssueMarkers(
 
   const markers: Monaco.editor.IMarkerData[] = [];
   for (const issue of issues) {
-    if (!issue.jsonPointer) {
+    if (issue.jsonPointer == null) {
       continue;
     }
 
@@ -260,13 +261,14 @@ function toIssueMarkers(
     }
 
     const start = model.getPositionAt(node.offset);
-    const end = model.getPositionAt(node.offset + node.length);
     markers.push({
       startLineNumber: start.lineNumber,
-      startColumn: start.column,
-      //Monaco always shows marker messages on hover, so to supress them and display clearer warning we give it 0 width
+      // Place zero-width marker at column 1 (line start / whitespace)
+      // so it feeds the problems panel but never triggers a hover
+      // tooltip that would overlap with our decoration hover.
+      startColumn: 1,
       endLineNumber: start.lineNumber,
-      endColumn: start.column,
+      endColumn: 1,
       severity: monaco.MarkerSeverity.Warning,
       source: issue.ruleId,
       message: `${issue.message}\nSuggestion: ${issue.suggestion}`,

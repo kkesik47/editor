@@ -3,11 +3,13 @@ import {colorRiskRule} from './rules/colorRiskRule.js';
 import {colorblindSafetyRule} from './rules/colorblindSafetyRule.js';
 import {lightnessContrastRule} from './rules/lightnessContrastRule.js';
 import {simulateCvdColors} from './rules/colorblindSafety/cvdSimulation.js';
+import { fontSizeRule } from './rules/fontSizeRule.js';
 
 const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [
   colorRiskRule,
   colorblindSafetyRule,
   lightnessContrastRule,
+  fontSizeRule,
 ];
 
 /**
