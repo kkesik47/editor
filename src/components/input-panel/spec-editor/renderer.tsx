@@ -164,6 +164,16 @@ function buildGrayscalePreviewSvg(issue: AccessibilityIssue): string {
 
 // ─── Issue → decoration / marker conversion ─────────────────────
 
+/**
+ * Convert accessibility issues into Monaco editor decorations.
+ *
+ * Creates wavy underline decorations with hover tooltips for each
+ * issue. The jsonPointer on the issue determines which JSON node
+ * gets underlined:
+ *   - Inline values (e.g. "labelFontSize": 9) → underlines just the value
+ *   - Config values → underlines the config property value
+ *   - Default values → underlines the specific channel (e.g. /encoding/x)
+ */
 function toIssueDecorations(
   issues: AccessibilityIssue[],
   editor: Monaco.editor.IStandaloneCodeEditor | null,
@@ -183,6 +193,7 @@ function toIssueDecorations(
     if (issue.jsonPointer == null) {
       continue;
     }
+
     const path = jsonPointerToPath(issue.jsonPointer);
     const node = findNodeAtLocation(tree, path);
     if (!node) {
@@ -233,6 +244,14 @@ function toIssueDecorations(
   return decorations;
 }
 
+/**
+ * Convert accessibility issues into Monaco marker data for the
+ * problems panel.
+ *
+ * Markers use zero-width ranges (startColumn === endColumn) placed
+ * at line start so they feed the problems panel without generating
+ * a hover tooltip that would overlap with the decoration hover.
+ */
 function toIssueMarkers(
   issues: AccessibilityIssue[],
   editor: Monaco.editor.IStandaloneCodeEditor | null,
@@ -248,6 +267,13 @@ function toIssueMarkers(
     return [];
   }
 
+  // Map issue severity to Monaco marker severity
+  const severityMap: Record<string, Monaco.MarkerSeverity> = {
+    error: monaco.MarkerSeverity.Error,
+    warning: monaco.MarkerSeverity.Warning,
+    info: monaco.MarkerSeverity.Info,
+  };
+
   const markers: Monaco.editor.IMarkerData[] = [];
   for (const issue of issues) {
     if (issue.jsonPointer == null) {
@@ -261,6 +287,8 @@ function toIssueMarkers(
     }
 
     const start = model.getPositionAt(node.offset);
+    const markerSeverity = severityMap[issue.severity] ?? monaco.MarkerSeverity.Warning;
+
     markers.push({
       startLineNumber: start.lineNumber,
       // Place zero-width marker at column 1 (line start / whitespace)
@@ -269,7 +297,7 @@ function toIssueMarkers(
       startColumn: 1,
       endLineNumber: start.lineNumber,
       endColumn: 1,
-      severity: monaco.MarkerSeverity.Warning,
+      severity: markerSeverity,
       source: issue.ruleId,
       message: `${issue.message}\nSuggestion: ${issue.suggestion}`,
     });

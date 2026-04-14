@@ -22,6 +22,15 @@
  * Two threshold tiers:
  *   - Title elements (chart title, axis titles, legend titles): 16 px
  *   - Label elements (axis labels, legend labels):              13 px
+ *
+ * JSON pointer strategy for defaults:
+ *   When neither inline nor config provides a value, the pointer
+ *   targets the most specific existing node where the author would
+ *   add the fix:
+ *     - If `axis` / `legend` object exists → point to it
+ *       (author adds `labelFontSize` inside it)
+ *     - Otherwise → point to the encoding channel
+ *       (author adds `"axis": { "labelFontSize": 16 }`)
  */
 
 // ─── Thresholds (pixels) ─────────────────────────────────────────
@@ -67,9 +76,15 @@ export interface FontSizeEntry {
 
   /**
    * JSON Pointer to the property in the spec.
-   * - inline:  points to the specific property (e.g. /encoding/x/axis/labelFontSize)
-   * - config:  points to the config property (e.g. /config/axis/labelFontSize)
-   * - default: points to the channel that uses this font (e.g. /encoding/x)
+   *
+   * Targeting strategy:
+   *   - inline:  the specific property (e.g. /encoding/x/axis/labelFontSize)
+   *              → Monaco underlines just the value like `9`
+   *   - config:  the config property (e.g. /config/axis/labelFontSize)
+   *              → Monaco underlines just the config value
+   *   - default: the most specific existing parent where the fix goes:
+   *              → /encoding/x/axis  (if axis object exists)
+   *              → /encoding/x       (if no axis object yet)
    */
   jsonPointer: string;
 }
@@ -100,6 +115,17 @@ function readPath(obj: Record<string, any>, path: string[]): unknown {
   return current;
 }
 
+/**
+ * Check whether a nested path exists and is an object in the spec.
+ *
+ * Used to decide the default pointer target: if the intermediate
+ * object (axis/legend) exists, we point there instead of the channel.
+ */
+function hasObjectAtPath(obj: Record<string, any>, path: string[]): boolean {
+  const value = readPath(obj, path);
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
 // ─── Shared resolution logic ─────────────────────────────────────
 
 interface ChannelFontSizeParams {
@@ -108,13 +134,13 @@ interface ChannelFontSizeParams {
   role: FontSizeRole;
   /** The inline value if present, or undefined. */
   inlineValue: unknown;
-  /** JSON pointer to the inline property. */
+  /** JSON pointer to the inline property (the value itself). */
   inlinePointer: string;
   /** Path to the config property. */
   configPath: string[];
   /** Vega-Lite default value. */
   defaultSize: number;
-  /** JSON pointer for default issues (points to the channel). */
+  /** JSON pointer for default issues (points to the best place to add the fix). */
   defaultPointer: string;
 }
 
@@ -213,6 +239,28 @@ const AXIS_LABELS: Record<string, string> = {
 };
 
 /**
+ * Pick the best JSON pointer for a default axis font-size issue.
+ *
+ * If the author already has an `axis` object on this channel,
+ * point to it — that's where they'd add `labelFontSize`.
+ * Otherwise, point to the channel itself — they need to create
+ * the `axis` block first.
+ *
+ * Examples:
+ *   { "x": { "field": "date", "axis": { "title": "Date" } } }
+ *   → pointer: /encoding/x/axis  (axis exists, add property here)
+ *
+ *   { "x": { "field": "date" } }
+ *   → pointer: /encoding/x  (no axis yet, create it here)
+ */
+function axisDefaultPointer(spec: Record<string, any>, channel: string): string {
+  const axisExists = hasObjectAtPath(spec, ['encoding', channel, 'axis']);
+  return axisExists
+    ? `/encoding/${channel}/axis`
+    : `/encoding/${channel}`;
+}
+
+/**
  * Check font sizes for one axis channel.
  *
  * Resolution order (per property):
@@ -230,6 +278,7 @@ function checkAxisChannel(
   if (!channelDef || typeof channelDef !== 'object') return [];
 
   const axisLabel = AXIS_LABELS[channel] ?? channel;
+  const defaultPtr = axisDefaultPointer(spec, channel);
   const entries: FontSizeEntry[] = [];
 
   // Check labelFontSize
@@ -242,7 +291,7 @@ function checkAxisChannel(
       inlinePointer: `/encoding/${channel}/axis/labelFontSize`,
       configPath: ['config', 'axis', 'labelFontSize'],
       defaultSize: DEFAULT_AXIS_LABEL_FONT_SIZE,
-      defaultPointer: `/encoding/${channel}`,
+      defaultPointer: defaultPtr,
     }),
   );
 
@@ -256,7 +305,7 @@ function checkAxisChannel(
       inlinePointer: `/encoding/${channel}/axis/titleFontSize`,
       configPath: ['config', 'axis', 'titleFontSize'],
       defaultSize: DEFAULT_AXIS_TITLE_FONT_SIZE,
-      defaultPointer: `/encoding/${channel}`,
+      defaultPointer: defaultPtr,
     }),
   );
 
@@ -279,6 +328,19 @@ const LEGEND_LABELS: Record<string, string> = {
 };
 
 /**
+ * Pick the best JSON pointer for a default legend font-size issue.
+ *
+ * Same logic as axisDefaultPointer: point to the `legend` object
+ * if it exists, otherwise to the channel itself.
+ */
+function legendDefaultPointer(spec: Record<string, any>, channel: string): string {
+  const legendExists = hasObjectAtPath(spec, ['encoding', channel, 'legend']);
+  return legendExists
+    ? `/encoding/${channel}/legend`
+    : `/encoding/${channel}`;
+}
+
+/**
  * Check font sizes for one legend channel.
  *
  * Resolution order (per property):
@@ -296,6 +358,7 @@ function checkLegendChannel(
   if (!channelDef || typeof channelDef !== 'object') return [];
 
   const legendLabel = LEGEND_LABELS[channel] ?? channel;
+  const defaultPtr = legendDefaultPointer(spec, channel);
   const entries: FontSizeEntry[] = [];
 
   // Check labelFontSize
@@ -308,7 +371,7 @@ function checkLegendChannel(
       inlinePointer: `/encoding/${channel}/legend/labelFontSize`,
       configPath: ['config', 'legend', 'labelFontSize'],
       defaultSize: DEFAULT_LEGEND_LABEL_FONT_SIZE,
-      defaultPointer: `/encoding/${channel}`,
+      defaultPointer: defaultPtr,
     }),
   );
 
@@ -322,7 +385,7 @@ function checkLegendChannel(
       inlinePointer: `/encoding/${channel}/legend/titleFontSize`,
       configPath: ['config', 'legend', 'titleFontSize'],
       defaultSize: DEFAULT_LEGEND_TITLE_FONT_SIZE,
-      defaultPointer: `/encoding/${channel}`,
+      defaultPointer: defaultPtr,
     }),
   );
 
@@ -340,8 +403,12 @@ function checkLegendChannel(
  *   - Each legend channel (color, size, etc.) — labels and title separately
  *
  * Resolution per element: inline → config → Vega-Lite default.
- * Default issues point to the specific channel (e.g. /encoding/x),
- * not the whole encoding block.
+ *
+ * JSON pointer targeting:
+ *   - Inline values → points to the value (underlines just `9`)
+ *   - Config values → points to the config property
+ *   - Defaults      → points to the axis/legend object if it exists,
+ *                      otherwise to the encoding channel
  *
  * @param spec - A parsed Vega-Lite specification object.
  * @returns Analysis result with all entries and those below threshold.
