@@ -3,13 +3,17 @@ import {colorRiskRule} from './rules/colorRiskRule.js';
 import {colorblindSafetyRule} from './rules/colorblindSafetyRule.js';
 import {lightnessContrastRule} from './rules/lightnessContrastRule.js';
 import {simulateCvdColors} from './rules/colorblindSafety/cvdSimulation.js';
-import { fontSizeRule } from './rules/fontSizeRule.js';
+import {fontSizeRule} from './rules/fontSizeRule.js';
+import {contrastRule} from './rules/contrastRule.js';
+import {colorOnlyEncodingRule} from './rules/colorOnlyEncodingRule.js';
 
 const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [
   colorRiskRule,
   colorblindSafetyRule,
   lightnessContrastRule,
   fontSizeRule,
+  contrastRule,
+  colorOnlyEncodingRule,
 ];
 
 /**
@@ -114,11 +118,14 @@ export function evaluateVegaLiteAccessibility(
   const deduplicated = deduplicateColorIssues(allIssues);
   const enriched = enrichWithCvdPreview(deduplicated);
 
-  // Sort: colorblind safety first, then color risk, then lightness
+  // Sort by rule category for consistent display order
   const priority: Record<string, number> = {
     'vl-a11y-colorblind-safety': 0,
     'vl-a11y-color-risk-rules': 1,
     'vl-a11y-lightness-contrast': 2,
+    'vl-a11y-font-size': 3,
+    'vl-a11y-contrast': 4,
+    'vl-a11y-color-only': 5,
   };
 
   return enriched.sort((a, b) => {

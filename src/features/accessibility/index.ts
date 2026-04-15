@@ -4,3 +4,5 @@ export * from './rules/colorRiskRule.js';
 export * from './rules/colorblindSafetyRule.js';
 export * from './rules/lightnessContrastRule.js';
 export * from './rules/fontSizeRule.js';
+export * from './rules/contrastRule.js';
+export * from './rules/colorOnlyEncodingRule.js';

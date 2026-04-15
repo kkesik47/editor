@@ -30,6 +30,17 @@ function jsonPointerToPath(pointer: string): (string | number)[] {
     });
 }
 
+// ─── Decoration style helpers ────────────────────────────────────
+
+/**
+ * Check whether an issue is a WCAG AAA suggestion (as opposed to
+ * a Level A / AA warning). AAA issues get a distinct blue-gray
+ * underline to visually separate "must fix" from "nice to have".
+ */
+function isAAASuggestion(issue: AccessibilityIssue): boolean {
+  return issue.evidence?.wcagLevel === 'AAA';
+}
+
 // ─── Color preview SVG builders ──────────────────────────────────
 
 /**
@@ -173,6 +184,9 @@ function buildGrayscalePreviewSvg(issue: AccessibilityIssue): string {
  *   - Inline values (e.g. "labelFontSize": 9) → underlines just the value
  *   - Config values → underlines the config property value
  *   - Default values → underlines the specific channel (e.g. /encoding/x)
+ *
+ * AAA-level issues (suggestions) get a distinct blue-gray underline
+ * to visually separate them from mandatory A/AA warnings (yellow).
  */
 function toIssueDecorations(
   issues: AccessibilityIssue[],
@@ -207,19 +221,27 @@ function toIssueDecorations(
     const cvdPreview = buildCvdPreviewSvg(issue);
     const grayscalePreview = buildGrayscalePreviewSvg(issue);
 
-    const hoverParts = [
-      `**Accessibility** (${issue.severity})`,
-      '',
-      issue.message,
-      '',
-      `Suggestion: ${issue.suggestion}`,
-    ];
+    // AAA issues are framed as suggestions, not problems
+    const isAAA = isAAASuggestion(issue);
+    const header = isAAA
+      ? `**Accessibility suggestion** (WCAG AAA)`
+      : `**Accessibility** (${issue.severity})`;
+
+    const hoverParts = [header, '', issue.message, '', `Suggestion: ${issue.suggestion}`];
     if (cvdPreview) {
       hoverParts.push('', cvdPreview);
     }
     if (grayscalePreview) {
       hoverParts.push('', grayscalePreview);
     }
+
+    // Pick decoration class based on WCAG level
+    const inlineClass = isAAA
+      ? 'a11ySuggestionInlineDecoration'
+      : 'a11yInlineDecoration';
+    const rangeClass = isAAA
+      ? 'a11ySuggestionRangeDecoration'
+      : 'a11yRangeDecoration';
 
     decorations.push({
       range: {
@@ -229,8 +251,8 @@ function toIssueDecorations(
         endColumn: end.column,
       },
       options: {
-        className: 'a11yRangeDecoration',
-        inlineClassName: 'a11yInlineDecoration',
+        className: rangeClass,
+        inlineClassName: inlineClass,
         stickiness: 1,
         hoverMessage: {
           value: hoverParts.join('\n'),

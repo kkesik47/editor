@@ -15,12 +15,35 @@
   justify-content: flex-end;
 }
 
+/* ── Accessibility decorations: warnings (Level A / AA) ────────── */
+
 .a11yInlineDecoration {
   text-decoration: underline wavy #d28a00;
   text-decoration-thickness: 1.5px;
-  text-underline-offset: 2px;
+  text-underline-offset: 1px;
 }
 
 .a11yRangeDecoration {
   background-color: rgba(210, 138, 0, 0.12);
+}
+
+/* ── Accessibility decorations: suggestions (Level AAA) ──────────
+ *
+ * Uses border-bottom instead of text-decoration so it can coexist
+ * with the yellow wavy underline from A/AA rules. When both rules
+ * target overlapping ranges (e.g. fontSizeRule underlines the axis
+ * object, contrast AAA underlines a color value inside it), CSS
+ * text-decoration can only show one — border-bottom avoids that.
+ */
+
+.a11ySuggestionInlineDecoration {
+  text-decoration: underline wavy #1c8ae4;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  /*border-bottom: 2px dashed #6b8aad;*/
+  /*padding-bottom: 4px;*/
+}
+
+.a11ySuggestionRangeDecoration {
+  background-color: rgba(107, 138, 173, 0.10);
 }
