@@ -6,6 +6,7 @@ import {simulateCvdColors} from './rules/colorblindSafety/cvdSimulation.js';
 import {fontSizeRule} from './rules/fontSizeRule.js';
 import {contrastRule} from './rules/contrastRule.js';
 import {colorOnlyEncodingRule} from './rules/colorOnlyEncodingRule.js';
+import {perceptualUniformityRule} from './rules/perceptualUniformityRule.js';
 
 const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [
   colorRiskRule,
@@ -14,6 +15,7 @@ const DEFAULT_VEGA_LITE_ACCESSIBILITY_RULES: AccessibilityRule[] = [
   fontSizeRule,
   contrastRule,
   colorOnlyEncodingRule,
+  perceptualUniformityRule,
 ];
 
 /**
@@ -126,6 +128,7 @@ export function evaluateVegaLiteAccessibility(
     'vl-a11y-font-size': 3,
     'vl-a11y-contrast': 4,
     'vl-a11y-color-only': 5,
+    'vl-a11y-perceptual-uniformity': 6,
   };
 
   return enriched.sort((a, b) => {
