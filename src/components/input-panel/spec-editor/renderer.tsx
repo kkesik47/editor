@@ -173,6 +173,132 @@ function buildGrayscalePreviewSvg(issue: AccessibilityIssue): string {
   return buildColorPreviewSvg(originalColors as string[], grayscaleColors as string[], 'Grayscale', isContinuous);
 }
 
+/**
+ * Build an inline SVG showing perceptual step unevenness.
+ *
+ * Layout:
+ *   Row 1: full gradient bar of the scale
+ *   Row 2: "Most change (33%→40%)"  — swatches + color difference
+ *   Row 3: "Least change (60%→67%)" — swatches + color difference
+ *
+ * The percentages show WHERE in the scale each change occurs,
+ * helping users understand which data intervals are affected.
+ *
+ * Returns an empty string if the issue has no step data.
+ */
+function buildUniformityPreviewSvg(issue: AccessibilityIssue): string {
+  const evidence = issue.evidence ?? {};
+  const steps = evidence.steps as
+    | {
+        deltaE: number;
+        colorA: string;
+        colorB: string;
+        indexA: number;
+        indexB: number;
+      }[]
+    | undefined;
+  const colorCount = (evidence.colorCount as number) || 0;
+  const domain = evidence.domain as [number, number] | null;
+  const fieldName = (evidence.fieldName as string) || null;
+
+  if (!Array.isArray(steps) || steps.length < 2 || colorCount < 2) {
+    return '';
+  }
+
+  // Find the largest and smallest steps
+  let largest = steps[0];
+  let smallest = steps[0];
+  for (const step of steps) {
+    if (step.deltaE > largest.deltaE) largest = step;
+    if (step.deltaE < smallest.deltaE) smallest = step;
+  }
+
+  // Build position labels — use real data values when domain is
+  // available, otherwise fall back to scale percentages.
+  const formatPosition = (indexA: number, indexB: number): string => {
+    if (domain) {
+      const [min, max] = domain;
+      const range = max - min;
+      const valA = Math.round(min + (indexA / (colorCount - 1)) * range);
+      const valB = Math.round(min + (indexB / (colorCount - 1)) * range);
+      const label = fieldName ?? 'value';
+      return `${label} ${valA}→${valB}`;
+    }
+    const pctA = Math.round((indexA / (colorCount - 1)) * 100);
+    const pctB = Math.round((indexB / (colorCount - 1)) * 100);
+    return `${pctA}%→${pctB}%`;
+  };
+
+  const largestLabel = `Biggest color change (${formatPosition(largest.indexA, largest.indexB)})`;
+  const smallestLabel = `Smallest color change (${formatPosition(smallest.indexA, smallest.indexB)})`;
+
+  // Collect all colors for the gradient (colorA of each step + colorB of last)
+  const allColors: string[] = steps.map((s) => s.colorA);
+  allColors.push(steps[steps.length - 1].colorB);
+
+  // Layout constants
+  const labelW = 220;
+  const paddingX = 8;
+  const paddingY = 6;
+  const barW = 220;
+  const barH = 16;
+  const swatchW = 36;
+  const swatchH = 22;
+  const swatchGap = 5;
+  const arrowW = 10;
+  const rowGap = 8;
+  const barX = labelW + paddingX;
+  const textStyle = 'font-family:system-ui,sans-serif;font-size:11px;fill:#333';
+  const smallTextStyle = 'font-family:system-ui,sans-serif;font-size:10px;fill:#666';
+
+  // Row Y positions
+  const gradientY = paddingY;
+  const largestY = gradientY + barH + rowGap + 2;
+  const smallestY = largestY + swatchH + rowGap;
+  const svgW = labelW + barW + paddingX * 2;
+  const svgH = smallestY + swatchH + paddingY;
+
+  // Gradient bar (row 1)
+  const gradStops = allColors
+    .map((color, i) => {
+      const offset = allColors.length === 1 ? 50 : Math.round((i / (allColors.length - 1)) * 100);
+      return `<stop offset="${offset}%" stop-color="${color}"/>`;
+    })
+    .join('');
+
+  const defs = `<defs><linearGradient id="unifGrad">${gradStops}</linearGradient></defs>`;
+  const gradientBar = `<rect x="${barX}" y="${gradientY}" width="${barW}" height="${barH}" fill="url(#unifGrad)" rx="2"/>`;
+
+  // Helper: build a swatch pair row
+  const buildPairRow = (label: string, colorA: string, colorB: string, deltaE: number, y: number): string => {
+    const swatchAX = barX;
+    const arrowX = swatchAX + swatchW + swatchGap;
+    const swatchBX = arrowX + arrowW + swatchGap;
+    const deltaX = swatchBX + swatchW + 8;
+
+    const swatchA = `<rect x="${swatchAX}" y="${y}" width="${swatchW}" height="${swatchH}" fill="${colorA}" rx="3" stroke="#ccc" stroke-width="0.5"/>`;
+    const arrow = `<text x="${arrowX}" y="${y + 15}" style="${textStyle}">→</text>`;
+    const swatchB = `<rect x="${swatchBX}" y="${y}" width="${swatchW}" height="${swatchH}" fill="${colorB}" rx="3" stroke="#ccc" stroke-width="0.5"/>`;
+    const deltaLabel = `<text x="${deltaX}" y="${y + 15}" style="${smallTextStyle}">color difference: ${deltaE}</text>`;
+    const rowLabel = `<text x="${paddingX}" y="${y + 15}" style="${textStyle}">${label}</text>`;
+
+    return [rowLabel, swatchA, arrow, swatchB, deltaLabel].join('');
+  };
+
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`,
+    `<rect width="${svgW}" height="${svgH}" fill="#fff" rx="4"/>`,
+    defs,
+    `<text x="${paddingX}" y="${gradientY + 12}" style="${textStyle}">Scale</text>`,
+    gradientBar,
+    buildPairRow(largestLabel, largest.colorA, largest.colorB, largest.deltaE, largestY),
+    buildPairRow(smallestLabel, smallest.colorA, smallest.colorB, smallest.deltaE, smallestY),
+    `</svg>`,
+  ].join('');
+
+  return `![Uniformity preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
+}
+
 // ─── Issue → decoration / marker conversion ─────────────────────
 
 /**
@@ -220,12 +346,11 @@ function toIssueDecorations(
     // Build the hover content — add color preview when available
     const cvdPreview = buildCvdPreviewSvg(issue);
     const grayscalePreview = buildGrayscalePreviewSvg(issue);
+    const uniformityPreview = buildUniformityPreviewSvg(issue);
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
-    const header = isAAA
-      ? `**Accessibility suggestion** (WCAG AAA)`
-      : `**Accessibility** (${issue.severity})`;
+    const header = isAAA ? `**Accessibility suggestion** (WCAG AAA)` : `**Accessibility** (${issue.severity})`;
 
     const hoverParts = [header, '', issue.message, '', `Suggestion: ${issue.suggestion}`];
     if (cvdPreview) {
@@ -234,14 +359,13 @@ function toIssueDecorations(
     if (grayscalePreview) {
       hoverParts.push('', grayscalePreview);
     }
+    if (uniformityPreview) {
+      hoverParts.push('', uniformityPreview);
+    }
 
     // Pick decoration class based on WCAG level
-    const inlineClass = isAAA
-      ? 'a11ySuggestionInlineDecoration'
-      : 'a11yInlineDecoration';
-    const rangeClass = isAAA
-      ? 'a11ySuggestionRangeDecoration'
-      : 'a11yRangeDecoration';
+    const inlineClass = isAAA ? 'a11ySuggestionInlineDecoration' : 'a11yInlineDecoration';
+    const rangeClass = isAAA ? 'a11ySuggestionRangeDecoration' : 'a11yRangeDecoration';
 
     decorations.push({
       range: {

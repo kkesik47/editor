@@ -36,6 +36,81 @@ import {
   MAX_MIN_RATIO_THRESHOLD,
 } from './perceptualUniformityAnalysis.js';
 
+// ─── Domain resolution ───────────────────────────────────────────
+
+/** Domain and field info for a color encoding channel. */
+interface DomainInfo {
+  /** The field name, e.g. "temperature". */
+  fieldName: string | null;
+  /** Explicit [min, max] domain, if set via scale.domain. */
+  domain: [number, number] | null;
+}
+
+/**
+ * Try to extract the field name and explicit numeric domain
+ * from the encoding channel that produced this scale.
+ *
+ * Only returns a domain when scale.domain is an explicit
+ * two-element numeric array — inferred domains from data
+ * are not available at spec-analysis time.
+ */
+function resolveDomainInfo(
+  spec: Record<string, any>,
+  channel: string,
+): DomainInfo {
+  const channelDef = spec?.encoding?.[channel];
+  if (!channelDef || typeof channelDef !== 'object') {
+    return {fieldName: null, domain: null};
+  }
+
+  const fieldName =
+    typeof channelDef.field === 'string' ? channelDef.field : null;
+
+  const rawDomain = channelDef?.scale?.domain;
+  let domain: [number, number] | null = null;
+
+  if (
+    Array.isArray(rawDomain) &&
+    rawDomain.length === 2 &&
+    typeof rawDomain[0] === 'number' &&
+    typeof rawDomain[1] === 'number'
+  ) {
+    domain = [rawDomain[0], rawDomain[1]];
+  }
+
+  return {fieldName, domain};
+}
+
+/** Shared evidence builder for all three issue types. */
+function buildStepEvidence(
+  scale: ResolvedScale,
+  analysis: UniformityAnalysisResult,
+  domainInfo: DomainInfo,
+): Record<string, unknown> {
+  return {
+    channel: scale.channel,
+    scaleType: scale.scaleType,
+    schemeName: scale.schemeName ?? null,
+    cv: analysis.cv,
+    maxMinRatio: analysis.maxMinRatio,
+    mean: analysis.mean,
+    stdDev: analysis.stdDev,
+    maxStep: analysis.maxStep,
+    minStep: analysis.minStep,
+    stepCount: analysis.steps.length,
+    colorCount: scale.colors.length,
+    fieldName: domainInfo.fieldName,
+    domain: domainInfo.domain,
+    steps: analysis.steps.map((s) => ({
+      deltaE: s.deltaE,
+      colorA: s.colorA,
+      colorB: s.colorB,
+      indexA: s.indexA,
+      indexB: s.indexB,
+    })),
+  };
+}
+
 // ─── Issue builders ──────────────────────────────────────────────
 
 /**
@@ -44,6 +119,7 @@ import {
 function buildWarningIssue(
   scale: ResolvedScale,
   analysis: UniformityAnalysisResult,
+  domainInfo: DomainInfo,
 ): AccessibilityIssue {
   const schemeNote = scale.schemeName
     ? ` (scheme '${scale.schemeName}')`
@@ -55,10 +131,11 @@ function buildWarningIssue(
 
     message:
       `The '${scale.channel}' sequential scale${schemeNote} is not ` +
-      `perceptually uniform — equal steps in data do not produce ` +
-      `equal steps in perceived color change. The largest color ` +
-      `change between adjacent values is ${analysis.maxMinRatio}× ` +
-      `the smallest, with a step unevenness score (CV) of ` +
+      `perceptually uniform. When moving between equally spaced ` +
+      `data values, some intervals produce a large visible color ` +
+      `change while others produce almost none ` +
+      `(${analysis.maxMinRatio}× difference between the biggest ` +
+      `and smallest color change). Unevenness score (CV): ` +
       `${analysis.cv} (0 = perfectly even, above 0.5 = problematic). ` +
       `This can create false visual boundaries and make some data ` +
       `differences appear larger or smaller than they really are.`,
@@ -70,23 +147,7 @@ function buildWarningIssue(
 
     jsonPointer: scale.jsonPointer,
 
-    evidence: {
-      channel: scale.channel,
-      scaleType: scale.scaleType,
-      schemeName: scale.schemeName ?? null,
-      cv: analysis.cv,
-      maxMinRatio: analysis.maxMinRatio,
-      mean: analysis.mean,
-      stdDev: analysis.stdDev,
-      maxStep: analysis.maxStep,
-      minStep: analysis.minStep,
-      stepCount: analysis.steps.length,
-      steps: analysis.steps.map((s) => ({
-        deltaE: s.deltaE,
-        colorA: s.colorA,
-        colorB: s.colorB,
-      })),
-    },
+    evidence: buildStepEvidence(scale, analysis, domainInfo),
   };
 }
 
@@ -96,6 +157,7 @@ function buildWarningIssue(
 function buildInfoIssue(
   scale: ResolvedScale,
   analysis: UniformityAnalysisResult,
+  domainInfo: DomainInfo,
 ): AccessibilityIssue {
   const schemeNote = scale.schemeName
     ? ` (scheme '${scale.schemeName}')`
@@ -107,12 +169,12 @@ function buildInfoIssue(
 
     message:
       `The '${scale.channel}' sequential scale${schemeNote} has ` +
-      `somewhat uneven perceptual steps — the largest color change ` +
-      `between adjacent values is ${analysis.maxMinRatio}× the ` +
-      `smallest, with a step unevenness score (CV) of ` +
-      `${analysis.cv} (0 = perfectly even, above 0.5 = problematic). ` +
-      `Some data ranges will appear to change faster than others, ` +
-      `which may not faithfully represent the data.`,
+      `somewhat uneven color distribution. When moving between ` +
+      `equally spaced data values, some intervals produce a ` +
+      `noticeably larger color change than others ` +
+      `(${analysis.maxMinRatio}× difference). Unevenness score ` +
+      `(CV): ${analysis.cv} (0 = perfectly even, above 0.5 = ` +
+      `problematic). This may not faithfully represent the data.`,
 
     suggestion:
       'For more faithful data representation, consider a ' +
@@ -120,23 +182,7 @@ function buildInfoIssue(
 
     jsonPointer: scale.jsonPointer,
 
-    evidence: {
-      channel: scale.channel,
-      scaleType: scale.scaleType,
-      schemeName: scale.schemeName ?? null,
-      cv: analysis.cv,
-      maxMinRatio: analysis.maxMinRatio,
-      mean: analysis.mean,
-      stdDev: analysis.stdDev,
-      maxStep: analysis.maxStep,
-      minStep: analysis.minStep,
-      stepCount: analysis.steps.length,
-      steps: analysis.steps.map((s) => ({
-        deltaE: s.deltaE,
-        colorA: s.colorA,
-        colorB: s.colorB,
-      })),
-    },
+    evidence: buildStepEvidence(scale, analysis, domainInfo),
   };
 }
 
@@ -151,22 +197,11 @@ function buildInfoIssue(
 function buildJumpIssue(
   scale: ResolvedScale,
   analysis: UniformityAnalysisResult,
+  domainInfo: DomainInfo,
 ): AccessibilityIssue {
   const schemeNote = scale.schemeName
     ? ` (scheme '${scale.schemeName}')`
     : '';
-
-  // Find the step with the largest ΔE
-  const largestStep = analysis.steps.reduce(
-    (max, s) => (s.deltaE > max.deltaE ? s : max),
-    analysis.steps[0],
-  );
-
-  // Find the step with the smallest ΔE
-  const smallestStep = analysis.steps.reduce(
-    (min, s) => (s.deltaE < min.deltaE ? s : min),
-    analysis.steps[0],
-  );
 
   return {
     ruleId: 'vl-a11y-perceptual-uniformity:localized-jump',
@@ -174,11 +209,11 @@ function buildJumpIssue(
 
     message:
       `The '${scale.channel}' sequential scale${schemeNote} has ` +
-      `a sudden color jump — one step in the scale changes ` +
-      `${analysis.maxMinRatio}× more than the smallest step. ` +
-      `This creates a false visual boundary at that point, ` +
-      `making it look like there is a sharp break in the data ` +
-      `when there may not be one.`,
+      `a sudden color jump — at one point in the scale, the color ` +
+      `changes ${analysis.maxMinRatio}× more than at the smoothest ` +
+      `point. This creates a false visual boundary, making it look ` +
+      `like there is a sharp break in the data when there may not ` +
+      `be one.`,
 
     suggestion:
       'Consider a perceptually uniform scheme such as "viridis" ' +
@@ -187,28 +222,7 @@ function buildJumpIssue(
 
     jsonPointer: scale.jsonPointer,
 
-    evidence: {
-      channel: scale.channel,
-      scaleType: scale.scaleType,
-      schemeName: scale.schemeName ?? null,
-      cv: analysis.cv,
-      maxMinRatio: analysis.maxMinRatio,
-      largestStep: {
-        deltaE: largestStep.deltaE,
-        colorA: largestStep.colorA,
-        colorB: largestStep.colorB,
-      },
-      smallestStep: {
-        deltaE: smallestStep.deltaE,
-        colorA: smallestStep.colorA,
-        colorB: smallestStep.colorB,
-      },
-      steps: analysis.steps.map((s) => ({
-        deltaE: s.deltaE,
-        colorA: s.colorA,
-        colorB: s.colorB,
-      })),
-    },
+    evidence: buildStepEvidence(scale, analysis, domainInfo),
   };
 }
 
@@ -235,17 +249,15 @@ export const perceptualUniformityRule: AccessibilityRule = {
       // Skip if not enough colors for reliable analysis
       if (!analysis.hasSufficientColors) continue;
 
+      const domainInfo = resolveDomainInfo(spec, scale.channel);
+
       if (analysis.cv > CV_WARNING_THRESHOLD) {
-        // Clearly non-uniform — warning
-        issues.push(buildWarningIssue(scale, analysis));
+        issues.push(buildWarningIssue(scale, analysis, domainInfo));
       } else if (analysis.cv > CV_OK_THRESHOLD) {
-        // Moderately uneven — info
-        issues.push(buildInfoIssue(scale, analysis));
+        issues.push(buildInfoIssue(scale, analysis, domainInfo));
       } else if (analysis.maxMinRatio > MAX_MIN_RATIO_THRESHOLD) {
-        // CV is OK overall, but there's a big localized jump
-        issues.push(buildJumpIssue(scale, analysis));
+        issues.push(buildJumpIssue(scale, analysis, domainInfo));
       }
-      // Otherwise: uniform enough, no issue
     }
 
     return issues;
