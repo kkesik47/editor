@@ -15,6 +15,8 @@
  *     Graphical elements (marks, scale colors) must have a contrast
  *     ratio ≥ 3:1 against the background.
  *     Severity: 'warning'.
+ *     Only checked for categorical scales — sequential/diverging
+ *     scales are handled by lightnessContrastRule instead.
  *
  *   Level AAA — WCAG 1.4.6 (Contrast – Enhanced)
  *     Text elements should have a contrast ratio ≥ 7:1.
@@ -173,6 +175,9 @@ function buildMarkAAIssue(
  *
  * Groups all failing colors into a single issue per scale to avoid
  * flooding the problems panel with one issue per color.
+ *
+ * Includes allColors, allRatios and backgroundColor so the renderer
+ * can build a visual preview showing each swatch on the background.
  */
 function buildScaleAAIssue(
   result: ScaleContrastResult,
@@ -211,6 +216,9 @@ function buildScaleAAIssue(
       failingColors: result.failingColors,
       channel: result.channel,
       schemeName: result.schemeName ?? null,
+      // Data for the hover preview SVG
+      allColors: result.allColors,
+      allRatios: result.allRatios,
     },
   };
 }
@@ -223,7 +231,8 @@ export const contrastRule: AccessibilityRule = {
   description:
     'Checks WCAG 2.1 contrast ratios: text elements need ≥ 4.5:1 ' +
     '(AA) or ≥ 7:1 (AAA) against the background; non-text graphical ' +
-    'elements need ≥ 3:1 (AA).',
+    'elements need ≥ 3:1 (AA). Scale contrast is only checked for ' +
+    'categorical scales.',
 
   evaluate(spec: Record<string, any>): AccessibilityIssue[] {
     const result = analyzeContrast(spec);
@@ -251,7 +260,7 @@ export const contrastRule: AccessibilityRule = {
       }
     }
 
-    // ── Non-text contrast: scales (AA) ──
+    // ── Non-text contrast: scales (AA, categorical only) ──
 
     for (const scaleResult of result.scaleResults) {
       issues.push(buildScaleAAIssue(scaleResult, bg));

@@ -299,6 +299,109 @@ function buildUniformityPreviewSvg(issue: AccessibilityIssue): string {
   return `![Uniformity preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
 }
 
+/**
+ * Build an inline SVG showing scale colors as swatches on the
+ * actual chart background, with failing colors (below threshold)
+ * marked with a red border and their contrast ratio in red.
+ *
+ * Returns an encoded data URI string for embedding in Markdown,
+ * or an empty string if the issue has no contrast preview data.
+ *
+ * Evidence fields used:
+ *   - allColors:       string[]   — every color in the scale
+ *   - allRatios:       number[]   — contrast ratio per color
+ *   - backgroundColor: string     — resolved chart background
+ *   - threshold:       number     — the 3:1 threshold
+ */
+function buildContrastPreviewSvg(issue: AccessibilityIssue): string {
+  const {allColors, allRatios, backgroundColor, threshold} = issue.evidence ?? {};
+ 
+  if (
+    !Array.isArray(allColors) ||
+    !Array.isArray(allRatios) ||
+    allColors.length === 0
+  ) {
+    return '';
+  }
+ 
+  const bg = (backgroundColor as string) ?? '#ffffff';
+  const limit = (threshold as number) ?? 3;
+  const colors = allColors as string[];
+  const ratios = allRatios as number[];
+ 
+  // ── Layout ──
+  const swatchW = 32;
+  const swatchH = 24;
+  const gap = 6;
+  const paddingX = 8;
+  const paddingY = 8;
+  const ratioH = 14;  // space for ratio text below swatches
+  const headerH = 20; // space for "Background: #xxx" label
+ 
+  const count = colors.length;
+  const totalSwatchW = count * (swatchW + gap) - gap;
+  const svgW = totalSwatchW + paddingX * 2;
+  const svgH = headerH + swatchH + ratioH + paddingY * 2 + 4;
+ 
+  const textStyle = 'font-family:system-ui,sans-serif;font-size:10px;';
+  const headerStyle = 'font-family:system-ui,sans-serif;font-size:11px;fill:#333;';
+ 
+  // ── Header ──
+  const headerY = paddingY + 11;
+  const header =
+    `<text x="${paddingX}" y="${headerY}" style="${headerStyle}">` +
+    `Background: ${bg}</text>`;
+ 
+  // ── Swatches ──
+  const swatchY = paddingY + headerH + 2;
+  const ratioTextY = swatchY + swatchH + 11;
+  const inset = 4;
+ 
+  const swatches = colors
+    .map((color, i) => {
+      const x = paddingX + i * (swatchW + gap);
+      const ratio = ratios[i] ?? 0;
+      const fails = ratio < limit;
+ 
+      // Background rect (the chart bg shows behind the swatch)
+      const bgRect =
+        `<rect x="${x}" y="${swatchY}" width="${swatchW}" height="${swatchH}" ` +
+        `fill="${bg}" rx="3" stroke="#ccc" stroke-width="0.5"/>`;
+ 
+      // Color swatch (slightly inset so bg peeks through)
+      const swatch =
+        `<rect x="${x + inset}" y="${swatchY + inset}" ` +
+        `width="${swatchW - inset * 2}" height="${swatchH - inset * 2}" ` +
+        `fill="${color}" rx="2"/>`;
+ 
+      // Red border on failing swatches
+      const border = fails
+        ? `<rect x="${x}" y="${swatchY}" width="${swatchW}" height="${swatchH}" ` +
+          `fill="none" stroke="#e15759" stroke-width="2" rx="3"/>`
+        : '';
+ 
+      // Ratio label (red if failing, green if passing)
+      const ratioColor = fails ? '#e15759' : '#59a14f';
+      const ratioLabel =
+        `<text x="${x + swatchW / 2}" y="${ratioTextY}" ` +
+        `text-anchor="middle" style="${textStyle}fill:${ratioColor};">` +
+        `${ratio}:1</text>`;
+ 
+      return bgRect + swatch + border + ratioLabel;
+    })
+    .join('');
+ 
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`,
+    `<rect width="${svgW}" height="${svgH}" fill="#fff" rx="4"/>`,
+    header,
+    swatches,
+    `</svg>`,
+  ].join('');
+ 
+  return `![Contrast preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
+}
+
 // ─── Issue → decoration / marker conversion ─────────────────────
 
 /**
@@ -347,6 +450,7 @@ function toIssueDecorations(
     const cvdPreview = buildCvdPreviewSvg(issue);
     const grayscalePreview = buildGrayscalePreviewSvg(issue);
     const uniformityPreview = buildUniformityPreviewSvg(issue);
+    const contrastPreview = buildContrastPreviewSvg(issue);
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
@@ -361,6 +465,9 @@ function toIssueDecorations(
     }
     if (uniformityPreview) {
       hoverParts.push('', uniformityPreview);
+    }
+    if (contrastPreview) {
+      hoverParts.push('', contrastPreview);
     }
 
     // Pick decoration class based on WCAG level

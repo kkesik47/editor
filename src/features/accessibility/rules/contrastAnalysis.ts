@@ -22,6 +22,13 @@
  *   2. config.background
  *   3. config.view.fill
  *   4. Default: #ffffff (white)
+ *
+ * Scale contrast (non-text):
+ *   Only checked for categorical scales (nominal / ordinal).
+ *   Sequential and diverging scales are skipped because individual
+ *   colors in a gradient are not meant to stand on their own —
+ *   their distinguishability is handled by lightnessContrastRule
+ *   and colorblindSafetyRule instead.
  */
 
 import {parse, converter} from 'culori';
@@ -186,6 +193,12 @@ export interface ScaleContrastResult {
 
   /** The lowest contrast ratio found in the scale. */
   worstRatio: number;
+
+  /** All colors in the scale (for the hover preview). */
+  allColors: string[];
+
+  /** Contrast ratio for each color in allColors (same order). */
+  allRatios: number[];
 }
 
 /** Full result of the contrast analysis. */
@@ -531,7 +544,16 @@ function collectMarkColors(
 // ─── Scale colors (non-text) ────────────────────────────────────
 
 /**
- * Check each color in every explicit scale against the background.
+ * Check each color in categorical scales against the background.
+ *
+ * Only categorical scales are checked here. In a categorical scale,
+ * each color represents a distinct category — if one is invisible
+ * against the background, an entire category disappears.
+ *
+ * Sequential and diverging scales are skipped because their colors
+ * form a gradient where individual colors are not meant to stand
+ * alone. Their distinguishability is covered by lightnessContrastRule
+ * and colorblindSafetyRule instead.
  *
  * Returns one result per scale that has at least one failing color.
  * Reuses resolveScaleColors from the CVD rule for scale extraction.
@@ -544,13 +566,25 @@ function checkScaleContrast(
   const results: ScaleContrastResult[] = [];
 
   for (const scale of scales) {
+    // Only check categorical scales — sequential/diverging colors
+    // are part of a gradient and don't need to individually contrast
+    // against the background.
+    if (scale.scaleType !== 'categorical') {
+      continue;
+    }
+
     const failing: {color: string; ratio: number; index: number}[] = [];
+    const allRatios: number[] = [];
     let worstRatio = Infinity;
 
     for (let i = 0; i < scale.colors.length; i++) {
       const ratio = computeContrastRatio(scale.colors[i], bg);
-      if (ratio == null) continue;
+      if (ratio == null) {
+        allRatios.push(0);
+        continue;
+      }
 
+      allRatios.push(round2(ratio));
       if (ratio < worstRatio) worstRatio = ratio;
 
       if (ratio < NON_TEXT_AA_THRESHOLD) {
@@ -565,6 +599,8 @@ function checkScaleContrast(
         jsonPointer: scale.jsonPointer,
         failingColors: failing,
         worstRatio: worstRatio === Infinity ? 0 : round2(worstRatio),
+        allColors: scale.colors,
+        allRatios,
       });
     }
   }
@@ -580,7 +616,7 @@ function checkScaleContrast(
  * Checks three categories against the resolved background:
  *   1. Text elements — titles, axis labels, legend labels
  *   2. Mark colors  — explicit mark.color/fill/stroke, encoding values
- *   3. Scale colors — each color in explicit scale ranges/schemes
+ *   3. Scale colors — each color in categorical scales only
  *
  * Text color resolution: inline → config → Vega-Lite default (black).
  * Background resolution: spec → config → config.view.fill → white.
@@ -611,7 +647,7 @@ export function analyzeContrast(
   const markEntries: MarkContrastEntry[] = [];
   collectMarkColors(spec, '', bg.color, markEntries);
 
-  // Scale colors
+  // Scale colors (categorical only)
   const scaleResults = checkScaleContrast(spec, bg.color);
 
   return {
