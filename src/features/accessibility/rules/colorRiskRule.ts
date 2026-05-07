@@ -1,3 +1,5 @@
+import {parse, converter} from 'culori';
+
 import {AccessibilityIssue, AccessibilityIssueSeverity, AccessibilityRule} from '../types.js';
 import colorRules from './colorRules.json';
 
@@ -49,38 +51,51 @@ type ExtractedColor = {
 };
 
 type ClassifiedColor = ExtractedColor & {
-  rgb: [number, number, number];
   hsl: [number, number, number];
   families: string[];
 };
 
 const COLOR_CHANNELS = ['color', 'fill', 'stroke'] as const;
-const KNOWN_COLOR_NAMES: Record<string, string> = {
-  red: '#ff0000',
-  darkred: '#8b0000',
-  crimson: '#dc143c',
-  green: '#008000',
-  darkgreen: '#006400',
-  lime: '#00ff00',
-  blue: '#0000ff',
-  navy: '#000080',
-  purple: '#800080',
-  violet: '#ee82ee',
-  magenta: '#ff00ff',
-  brown: '#a52a2a',
-  black: '#000000',
-  gray: '#808080',
-  grey: '#808080',
-  pink: '#ffc0cb',
-  turquoise: '#40e0d0',
-  cyan: '#00ffff',
-  teal: '#008080',
-  orange: '#ffa500',
-  yellow: '#ffff00',
-  white: '#ffffff',
-};
 
 const rules = colorRules as ColorRulesKnowledgeBase;
+
+// ─── Color parsing (via culori) ──────────────────────────────────
+
+/**
+ * Reusable HSL converter — same pattern used in contrastAnalysis.ts
+ * and cvdSimulation.ts. Instantiated once and reused.
+ */
+const toHsl = converter('hsl');
+
+/**
+ * Parse any CSS color string to [hue, saturation, lightness].
+ *
+ *   hue        : degrees in [0, 360]
+ *   saturation : fraction in [0, 1]
+ *   lightness  : fraction in [0, 1]
+ *
+ * Same scale colorRules.json already expects — no threshold changes.
+ *
+ * Culori handles every CSS color form Vega-Lite users might write:
+ * hex (#rgb, #rrggbb, #rrggbbaa), rgb()/rgba(), hsl()/hsla(), all
+ * 147 named colors, plus lab/lch/oklab/oklch/hwb/color().
+ *
+ * Achromatic colors (pure grays, black, white) have no defined hue
+ * in HSL — culori returns `hue: undefined` for them. We substitute
+ * 0, which is safe because our `gray` and `black` family thresholds
+ * bound on saturationMax (so hue is irrelevant for those matches).
+ */
+function parseColorToHsl(input: string): [number, number, number] | null {
+  const parsed = parse(input);
+  if (!parsed) return null;
+
+  const hsl = toHsl(parsed);
+  if (!hsl) return null;
+
+  return [hsl.h ?? 0, hsl.s, hsl.l];
+}
+
+// ─── JSON pointer utilities ──────────────────────────────────────
 
 function escapeJsonPointerToken(token: string): string {
   return token.replaceAll('~', '~0').replaceAll('/', '~1');
@@ -92,117 +107,7 @@ function normalizeColorLiteral(input: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function hexToRgb(hex: string): [number, number, number] | null {
-  const value = hex.replace('#', '');
-  if (![3, 6].includes(value.length)) return null;
-
-  const expanded =
-    value.length === 3
-      ? value
-          .split('')
-          .map((part) => `${part}${part}`)
-          .join('')
-      : value;
-
-  const parsed = Number.parseInt(expanded, 16);
-  if (Number.isNaN(parsed)) return null;
-
-  return [(parsed >> 16) & 255, (parsed >> 8) & 255, parsed & 255];
-}
-
-function rgbFunctionToRgb(value: string): [number, number, number] | null {
-  const match = value.match(/rgba?\(([^)]+)\)/i);
-  if (!match) return null;
-
-  const [r, g, b] = match[1]
-    .split(',')
-    .slice(0, 3)
-    .map((part) => Number.parseFloat(part.trim()));
-
-  if ([r, g, b].some((channel) => Number.isNaN(channel))) return null;
-
-  return [Math.max(0, Math.min(255, r)), Math.max(0, Math.min(255, g)), Math.max(0, Math.min(255, b))];
-}
-
-function hslFunctionToRgb(value: string): [number, number, number] | null {
-  const match = value.match(/hsla?\(([^)]+)\)/i);
-  if (!match) return null;
-
-  const [rawHue, rawSaturation, rawLightness] = match[1]
-    .split(',')
-    .slice(0, 3)
-    .map((part) => part.trim());
-  if (!rawHue || !rawSaturation || !rawLightness) return null;
-
-  const hue = Number.parseFloat(rawHue);
-  const saturation = Number.parseFloat(rawSaturation.replace('%', '')) / 100;
-  const lightness = Number.parseFloat(rawLightness.replace('%', '')) / 100;
-
-  if ([hue, saturation, lightness].some((channel) => Number.isNaN(channel))) return null;
-
-  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
-  const hPrime = (((hue % 360) + 360) % 360) / 60;
-  const x = c * (1 - Math.abs((hPrime % 2) - 1));
-
-  let [r1, g1, b1] = [0, 0, 0];
-  if (hPrime < 1) [r1, g1, b1] = [c, x, 0];
-  else if (hPrime < 2) [r1, g1, b1] = [x, c, 0];
-  else if (hPrime < 3) [r1, g1, b1] = [0, c, x];
-  else if (hPrime < 4) [r1, g1, b1] = [0, x, c];
-  else if (hPrime < 5) [r1, g1, b1] = [x, 0, c];
-  else [r1, g1, b1] = [c, 0, x];
-
-  const m = lightness - c / 2;
-  return [Math.round((r1 + m) * 255), Math.round((g1 + m) * 255), Math.round((b1 + m) * 255)];
-}
-
-function parseColorToRgb(normalizedColor: string): [number, number, number] | null {
-  if (normalizedColor.startsWith('#')) {
-    return hexToRgb(normalizedColor);
-  }
-
-  if (normalizedColor.startsWith('rgb')) {
-    return rgbFunctionToRgb(normalizedColor);
-  }
-
-  if (normalizedColor.startsWith('hsl')) {
-    return hslFunctionToRgb(normalizedColor);
-  }
-
-  const colorNameHex = KNOWN_COLOR_NAMES[normalizedColor];
-  if (colorNameHex) {
-    return hexToRgb(colorNameHex);
-  }
-
-  return null;
-}
-
-function rgbToHsl([r, g, b]: [number, number, number]): [number, number, number] {
-  const rNorm = r / 255;
-  const gNorm = g / 255;
-  const bNorm = b / 255;
-
-  const max = Math.max(rNorm, gNorm, bNorm);
-  const min = Math.min(rNorm, gNorm, bNorm);
-  const delta = max - min;
-
-  let hue = 0;
-  if (delta !== 0) {
-    if (max === rNorm) {
-      hue = ((gNorm - bNorm) / delta) % 6;
-    } else if (max === gNorm) {
-      hue = (bNorm - rNorm) / delta + 2;
-    } else {
-      hue = (rNorm - gNorm) / delta + 4;
-    }
-  }
-
-  hue = Math.round((hue * 60 + 360) % 360);
-  const lightness = (max + min) / 2;
-  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
-
-  return [hue, saturation, lightness];
-}
+// ─── Family classification ───────────────────────────────────────
 
 function isWithinRange(value: number, min?: number, max?: number): boolean {
   if (typeof min === 'number' && value < min) return false;
@@ -237,6 +142,8 @@ function classifyColorFamilies(hsl: [number, number, number], familyDefinitions:
     })
     .map((family) => family.id);
 }
+
+// ─── Color extraction from spec ──────────────────────────────────
 
 function pushColor(found: ExtractedColor[], value: unknown, jsonPointer: string, source: string) {
   const normalized = normalizeColorLiteral(value);
@@ -334,6 +241,8 @@ function inferFamiliesFromSchemeName(schemeName: string, familyDefinitions: Colo
   return Array.from(new Set(directFamilyMatches));
 }
 
+// ─── Main evaluation ─────────────────────────────────────────────
+
 function evaluateColorCombinationRisk(
   spec: Record<string, any>,
   knowledgeBase: ColorRulesKnowledgeBase,
@@ -342,27 +251,26 @@ function evaluateColorCombinationRisk(
 
   const classified: ClassifiedColor[] = extracted
     .map((entry) => {
-      const rgb = parseColorToRgb(entry.normalized);
-      if (rgb) {
-        const hsl = rgbToHsl(rgb);
+      const hsl = parseColorToHsl(entry.normalized);
+      if (hsl) {
         const families = classifyColorFamilies(hsl, knowledgeBase.families);
         if (families.length === 0) return null;
 
         return {
           ...entry,
-          rgb,
           hsl,
           families,
         };
       }
 
+      // Scheme names (e.g. "viridis", "rdylgn") are not parseable as
+      // colors — fall back to name-based family inference.
       if (entry.source.endsWith('scale.scheme')) {
         const families = inferFamiliesFromSchemeName(entry.normalized, knowledgeBase.families);
         if (families.length === 0) return null;
 
         return {
           ...entry,
-          rgb: [0, 0, 0] as [number, number, number],
           hsl: [0, 0, 0] as [number, number, number],
           families,
         };
@@ -429,6 +337,8 @@ function evaluateColorCombinationRisk(
       } as AccessibilityIssue;
     });
 }
+
+// ─── The rule ────────────────────────────────────────────────────
 
 export const colorRiskRule: AccessibilityRule = {
   id: 'vl-a11y-color-risk-engine',
