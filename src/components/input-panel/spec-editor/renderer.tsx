@@ -307,6 +307,9 @@ function buildUniformityPreviewSvg(issue: AccessibilityIssue): string {
  * Returns an encoded data URI string for embedding in Markdown,
  * or an empty string if the issue has no contrast preview data.
  *
+ * Used for both multi-color scale issues and single-color mark
+ * issues (which wrap their single color into one-element arrays).
+ *
  * Evidence fields used:
  *   - allColors:       string[]   — every color in the scale
  *   - allRatios:       number[]   — contrast ratio per color
@@ -315,7 +318,7 @@ function buildUniformityPreviewSvg(issue: AccessibilityIssue): string {
  */
 function buildContrastPreviewSvg(issue: AccessibilityIssue): string {
   const {allColors, allRatios, backgroundColor, threshold} = issue.evidence ?? {};
- 
+
   if (
     !Array.isArray(allColors) ||
     !Array.isArray(allRatios) ||
@@ -323,12 +326,12 @@ function buildContrastPreviewSvg(issue: AccessibilityIssue): string {
   ) {
     return '';
   }
- 
+
   const bg = (backgroundColor as string) ?? '#ffffff';
   const limit = (threshold as number) ?? 3;
   const colors = allColors as string[];
   const ratios = allRatios as number[];
- 
+
   // ── Layout ──
   const swatchW = 32;
   const swatchH = 24;
@@ -337,60 +340,69 @@ function buildContrastPreviewSvg(issue: AccessibilityIssue): string {
   const paddingY = 8;
   const ratioH = 14;  // space for ratio text below swatches
   const headerH = 20; // space for "Background: #xxx" label
- 
+
   const count = colors.length;
   const totalSwatchW = count * (swatchW + gap) - gap;
-  const svgW = totalSwatchW + paddingX * 2;
+
+  // Ensure the SVG is wide enough for the "Background: #xxx" header
+  // text. Without this, single-color and two-color previews end up
+  // narrower than the header and clip it (e.g. "Background: #1a4147"
+  // gets cropped to "Background: #1a"). Approximate the header width
+  // at ~5 px per character for the 11 px system-ui font.
+  const headerText = `Background: ${bg}`;
+  const headerNeededW = headerText.length * 5 + paddingX * 2 + 4;
+
+  const svgW = Math.max(totalSwatchW + paddingX * 2, headerNeededW);
   const svgH = headerH + swatchH + ratioH + paddingY * 2 + 4;
- 
+
   const textStyle = 'font-family:system-ui,sans-serif;font-size:10px;';
   const headerStyle = 'font-family:system-ui,sans-serif;font-size:11px;fill:#333;';
- 
+
   // ── Header ──
   const headerY = paddingY + 11;
   const header =
     `<text x="${paddingX}" y="${headerY}" style="${headerStyle}">` +
     `Background: ${bg}</text>`;
- 
+
   // ── Swatches ──
   const swatchY = paddingY + headerH + 2;
   const ratioTextY = swatchY + swatchH + 11;
   const inset = 4;
- 
+
   const swatches = colors
     .map((color, i) => {
       const x = paddingX + i * (swatchW + gap);
       const ratio = ratios[i] ?? 0;
       const fails = ratio < limit;
- 
+
       // Background rect (the chart bg shows behind the swatch)
       const bgRect =
         `<rect x="${x}" y="${swatchY}" width="${swatchW}" height="${swatchH}" ` +
         `fill="${bg}" rx="3" stroke="#ccc" stroke-width="0.5"/>`;
- 
+
       // Color swatch (slightly inset so bg peeks through)
       const swatch =
         `<rect x="${x + inset}" y="${swatchY + inset}" ` +
         `width="${swatchW - inset * 2}" height="${swatchH - inset * 2}" ` +
         `fill="${color}" rx="2"/>`;
- 
+
       // Red border on failing swatches
       const border = fails
         ? `<rect x="${x}" y="${swatchY}" width="${swatchW}" height="${swatchH}" ` +
           `fill="none" stroke="#e15759" stroke-width="2" rx="3"/>`
         : '';
- 
+
       // Ratio label (red if failing, green if passing)
       const ratioColor = fails ? '#e15759' : '#59a14f';
       const ratioLabel =
         `<text x="${x + swatchW / 2}" y="${ratioTextY}" ` +
         `text-anchor="middle" style="${textStyle}fill:${ratioColor};">` +
         `${ratio}:1</text>`;
- 
+
       return bgRect + swatch + border + ratioLabel;
     })
     .join('');
- 
+
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`,
     `<rect width="${svgW}" height="${svgH}" fill="#fff" rx="4"/>`,
@@ -398,8 +410,126 @@ function buildContrastPreviewSvg(issue: AccessibilityIssue): string {
     swatches,
     `</svg>`,
   ].join('');
- 
+
   return `![Contrast preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
+}
+
+/**
+ * Build an inline SVG previewing a text contrast issue.
+ *
+ * Renders the element's own name (e.g. "X-axis labels", "Chart title")
+ * in the failing foreground color on the actual background — so the
+ * user can see the legibility problem the way the chart's reader will.
+ *
+ * Used for both AA fails (red caption: "fails AA, needs ≥4.5:1") and
+ * AAA suggestions (blue caption: "passes AA, falls short of AAA").
+ *
+ * Returns an empty string if the issue is not a text contrast issue
+ * or has no element label.
+ *
+ * Evidence fields used:
+ *   - elementType:     'text'   — gates this preview
+ *   - elementLabel:    string   — the human-readable element name
+ *   - foregroundColor: string   — resolved text color
+ *   - backgroundColor: string   — resolved chart background
+ *   - contrastRatio:   number   — measured ratio
+ *   - threshold:       number   — 4.5 (AA) or 7 (AAA)
+ *   - wcagLevel:       'AA'|'AAA'
+ */
+function buildTextSamplePreviewSvg(issue: AccessibilityIssue): string {
+  const {
+    elementType,
+    elementLabel,
+    foregroundColor,
+    backgroundColor,
+    contrastRatio,
+    threshold,
+    wcagLevel,
+  } = issue.evidence ?? {};
+
+  if (elementType !== 'text' || typeof elementLabel !== 'string') {
+    return '';
+  }
+
+  const fg = (foregroundColor as string) ?? '#000000';
+  const bg = (backgroundColor as string) ?? '#ffffff';
+  const ratio = (contrastRatio as number) ?? 0;
+  const limit = (threshold as number) ?? 4.5;
+  const label = elementLabel as string;
+  const isAAA = wcagLevel === 'AAA';
+
+  // ── Layout ──
+  const sampleFontSize = 14;
+  const sampleH = 38;
+  const paddingX = 8;
+  const paddingY = 6;
+  const captionGap = 4;
+  const captionH = 14;
+
+  // Phrasing differs by WCAG level:
+  //   AA  → ratio is below 4.5, so this is a real fail (red)
+  //   AAA → ratio passes AA but is below 7, suggestion only (blue)
+  let captionText: string;
+  let captionColor: string;
+  if (isAAA) {
+    captionText = `${ratio}:1 — passes AA, falls short of AAA (≥${limit}:1)`;
+    captionColor = '#1c8ae4';
+  } else {
+    captionText = `${ratio}:1 — fails AA (needs ≥${limit}:1)`;
+    captionColor = '#e15759';
+  }
+
+  // Approximate text widths at the system-ui font:
+  //   sample text at 14 px ≈ 8 px per character
+  //   caption  text at 11 px ≈ 6.5 px per character
+  // Width must accommodate both, with comfortable padding inside the
+  // sample box around the rendered label.
+  const sampleNeededW = label.length * 8 + 32;
+  const captionNeededW = captionText.length * 6.5 + 4;
+
+  const innerW = Math.max(sampleNeededW, captionNeededW, 200);
+  const svgW = innerW + paddingX * 2;
+  const svgH = paddingY + sampleH + captionGap + captionH + paddingY;
+
+  // ── Sample box ──
+  const sampleX = paddingX;
+  const sampleY = paddingY;
+  const sampleW = innerW;
+
+  const sampleBox =
+    `<rect x="${sampleX}" y="${sampleY}" width="${sampleW}" ` +
+    `height="${sampleH}" fill="${bg}" rx="3" ` +
+    `stroke="#ccc" stroke-width="0.5"/>`;
+
+  // Vertically center the text inside the sample box.
+  const sampleTextX = sampleX + sampleW / 2;
+  const sampleTextY = sampleY + sampleH / 2 + sampleFontSize / 2 - 1;
+
+  const sampleText =
+    `<text x="${sampleTextX}" y="${sampleTextY}" ` +
+    `text-anchor="middle" ` +
+    `style="font-family:system-ui,sans-serif;` +
+    `font-size:${sampleFontSize}px;fill:${fg};">` +
+    `${label}</text>`;
+
+  // ── Caption ──
+  const captionY = sampleY + sampleH + captionGap + 11;
+  const caption =
+    `<text x="${paddingX}" y="${captionY}" ` +
+    `style="font-family:system-ui,sans-serif;` +
+    `font-size:11px;fill:${captionColor};">` +
+    `${captionText}</text>`;
+
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`,
+    `<rect width="${svgW}" height="${svgH}" fill="#fff" rx="4"/>`,
+    sampleBox,
+    sampleText,
+    caption,
+    `</svg>`,
+  ].join('');
+
+  return `![Text contrast preview](data:image/svg+xml,${encodeURIComponent(svg)})`;
 }
 
 // ─── Issue → decoration / marker conversion ─────────────────────
@@ -451,6 +581,7 @@ function toIssueDecorations(
     const grayscalePreview = buildGrayscalePreviewSvg(issue);
     const uniformityPreview = buildUniformityPreviewSvg(issue);
     const contrastPreview = buildContrastPreviewSvg(issue);
+    const textSamplePreview = buildTextSamplePreviewSvg(issue);
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
@@ -468,6 +599,9 @@ function toIssueDecorations(
     }
     if (contrastPreview) {
       hoverParts.push('', contrastPreview);
+    }
+    if (textSamplePreview) {
+      hoverParts.push('', textSamplePreview);
     }
 
     // Pick decoration class based on WCAG level
@@ -568,7 +702,7 @@ const EditorWithNavigation: React.FC<{
   parseSpec: (force: boolean) => void;
   setConfig: (config: string) => void;
   setDecorations: (decorations: any[]) => void;
-  setEditorFocus: (focus: string) => void;
+  setEditorFocus: (focus: any) => void;
   setEditorReference: (reference: any) => void;
   updateEditorString: (editorString: string) => void;
   updateVegaLiteSpec: (spec: string, config?: string) => void;

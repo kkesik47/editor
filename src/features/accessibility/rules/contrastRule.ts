@@ -43,6 +43,11 @@ import {
 
 /**
  * Build an issue for a text element that fails WCAG AA (< 4.5:1).
+ *
+ * Evidence includes `elementLabel` so the renderer can produce a
+ * "sample text" preview showing the element's name (e.g. "X-axis
+ * labels") rendered in the failing foreground color on the actual
+ * background — letting the user see the legibility problem directly.
  */
 function buildTextAAIssue(
   entry: TextContrastEntry,
@@ -82,6 +87,7 @@ function buildTextAAIssue(
       wcagLevel: 'AA',
       wcagCriterion: '1.4.3',
       elementType: 'text',
+      elementLabel: entry.label,
       foregroundColor: entry.foregroundColor,
       backgroundColor: bg,
       contrastRatio: entry.contrastRatio,
@@ -123,6 +129,7 @@ function buildTextAAAIssue(
       wcagLevel: 'AAA',
       wcagCriterion: '1.4.6',
       elementType: 'text',
+      elementLabel: entry.label,
       foregroundColor: entry.foregroundColor,
       backgroundColor: bg,
       contrastRatio: entry.contrastRatio,
@@ -134,6 +141,11 @@ function buildTextAAAIssue(
 
 /**
  * Build an issue for a mark/encoding color that fails non-text AA (< 3:1).
+ *
+ * Evidence includes `allColors` and `allRatios` (each as a single-
+ * element array) so the renderer can reuse the scale-contrast preview
+ * SVG to show one swatch on the background — visually consistent with
+ * how multi-color scale issues are rendered.
  */
 function buildMarkAAIssue(
   entry: MarkContrastEntry,
@@ -161,11 +173,16 @@ function buildMarkAAIssue(
       wcagLevel: 'AA',
       wcagCriterion: '1.4.11',
       elementType: 'non-text',
+      elementLabel: entry.label,
       foregroundColor: entry.foregroundColor,
       backgroundColor: bg,
       contrastRatio: entry.contrastRatio,
       threshold: NON_TEXT_AA_THRESHOLD,
       source: entry.source,
+      // Wrap the single color into the same shape the scale preview
+      // expects, so the renderer can reuse buildContrastPreviewSvg.
+      allColors: [entry.foregroundColor],
+      allRatios: [entry.contrastRatio],
     },
   };
 }
