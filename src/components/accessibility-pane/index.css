@@ -1,0 +1,170 @@
+/* ── AccessibilityPane styles ──────────────────────────────────── */
+
+.accessibility-pane {
+  overflow: auto;
+  width: 100%;
+  flex: 1;
+  padding: 14px 16px;
+  line-height: 1.45;
+  font-size: 13px;
+  color: black;
+  background: #f7f7f7;
+}
+
+/* Section (Warnings / Suggestions) */
+
+.accessibility-pane .a11y-section {
+  margin-bottom: 18px;
+}
+
+.accessibility-pane .a11y-section:last-child {
+  margin-bottom: 0;
+}
+
+.accessibility-pane .a11y-section-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+  color: var(--extra-dark-gray-color);
+  margin: 0 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--gray-color);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.accessibility-pane .a11y-section-warning-count {
+  color: var(--warning-color);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.accessibility-pane .a11y-section-suggestion-count {
+  color: #1c8ae4;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+/* Issue cards */
+
+.accessibility-pane .a11y-issue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.accessibility-pane .a11y-issue {
+  border: 1px solid var(--gray-color);
+  border-left: 4px solid var(--gray-color);
+  border-radius: 3px;
+  padding: 10px 12px;
+  background: var(--white-color);
+}
+
+/* Severity-coded left border */
+
+.accessibility-pane .a11y-issue.severity-warning {
+  border-left-color: var(--warning-color); /* matches the yellow wavy underline */
+}
+
+.accessibility-pane .a11y-issue.severity-info {
+  border-left-color: #1c8ae4; /* matches the blue AAA underline */
+}
+
+/* Issue header row */
+
+.accessibility-pane .a11y-issue-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.accessibility-pane .a11y-issue-pointer {
+  font-size: 10px;
+  color: var(--extra-dark-gray-color);
+  word-break: break-all;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.accessibility-pane .a11y-issue-rule-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  color: rgb(255, 255, 255);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Issue body */
+
+.accessibility-pane .a11y-issue-message {
+  font-family: var(--base-font-family);
+  font-size: 14px;
+  font-weight: 450;
+  margin: 0 0 5px 0;
+  color: black;
+  font-optical-sizing: auto;
+  line-height: 1.4;
+}
+
+.accessibility-pane .a11y-issue-suggestion {
+  font-family: var(--base-font-family);
+  margin: 0;
+  color: rgb(0, 0, 0);
+  font-weight: 450;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.accessibility-pane .a11y-issue-suggestion strong {
+  font-family: var(--base-font-family);
+  color: rgb(0, 0, 0);
+  font-weight: 600;
+}
+
+/* Previews */
+
+.accessibility-pane .a11y-issue-previews {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.accessibility-pane .a11y-issue-previews img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Empty state */
+
+.accessibility-pane .a11y-empty {
+  color: #475569;
+  margin: 0;
+  padding: 14px;
+  background: #d9ffd9;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+}
+
+.accessibility-pane .a11y-empty .a11y-empty-headline {
+  font-weight: 700;
+  color: #0c4404;
+  margin: 0 0 6px 0;
+}
+
+.accessibility-pane .a11y-empty .a11y-empty-note {
+  font-size: 12px;
+  font-weight: 450;
+  margin: 0;
+  color: #1a1919;
+}

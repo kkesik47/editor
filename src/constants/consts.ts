@@ -46,6 +46,7 @@ export const NAVBAR = {
   Logs: 'Logs',
   SignalViewer: 'SignalViewer',
   DataflowViewer: 'DataflowViewer',
+  Accessibility: 'Accessibility',
 } as const;
 
 export const SIDEPANE = {

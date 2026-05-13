@@ -8,7 +8,7 @@ const DebugPaneHeader: React.FC = () => {
   const {state, setState} = useAppContext();
   const effectRan = useRef(false);
 
-  const {debugPane, error, errors, logs, navItem, warns} = state;
+  const {debugPane, error, errors, logs, navItem, warns, accessibilityIssues} = state;
 
   const showLogs = useCallback((show: boolean) => setState((s) => ({...s, logs: show})), [setState]);
 
@@ -67,6 +67,23 @@ const DebugPaneHeader: React.FC = () => {
     [debugPane, showLogs, toggleNavbar],
   );
 
+  const handleAccessibilityClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (debugPane) {
+        e.stopPropagation();
+      }
+      showLogs(false);
+      toggleNavbar(NAVBAR.Accessibility);
+    },
+    [debugPane, showLogs, toggleNavbar],
+  );
+
+  // The Accessibility tab shows a `(N)` counter with the total issue
+  // count. We deliberately do NOT auto-open the debug pane on issues —
+  // unlike errors, most charts have at least one issue (e.g. default
+  // font-size info), which would be too aggressive a UX.
+  const accessibilityCount = accessibilityIssues?.length ?? 0;
+
   return (
     <div className="pane-header" onClick={toggleDebugPane}>
       <ul className="tabs-nav">
@@ -98,6 +115,15 @@ const DebugPaneHeader: React.FC = () => {
             onClick={handleDataflowViewerClick}
           >
             Dataflow Viewer
+          </li>
+        )}
+        {error === null && (
+          <li
+            className={navItem === NAVBAR.Accessibility ? 'active-tab' : undefined}
+            onClick={handleAccessibilityClick}
+          >
+            Accessibility
+            {accessibilityCount > 0 && ` (${accessibilityCount})`}
           </li>
         )}
       </ul>

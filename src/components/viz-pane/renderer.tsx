@@ -6,6 +6,7 @@ import {version as TOOLTIP_VERSION} from 'vega-tooltip';
 
 import {EDITOR_FOCUS, LAYOUT, NAVBAR, WORD_SEPARATORS} from '../../constants/index.js';
 import {DataflowViewer} from '../../features/dataflow/DataflowViewer.js';
+import AccessibilityPane from '../accessibility-pane/index.js';
 import DataViewer from '../data-viewer/renderer.js';
 import ErrorBoundary from '../error-boundary/index.js';
 import ErrorPane from '../error-pane/index.js';
@@ -127,10 +128,19 @@ const VizPane: React.FC<VizPaneProps> = (props) => {
   );
   /**
    *  Get the Component to be rendered in the Context Viewer.
+   *
+   *  The Accessibility pane is handled BEFORE the `props.view` check
+   *  because, unlike the other viewers, it doesn't depend on a
+   *  rendered Vega view — it only needs the spec-level
+   *  `accessibilityIssues` list, which is available even when the
+   *  view is unavailable (e.g., empty spec).
    */
   const getContextViewer = useCallback(() => {
     if (!props.debugPane) {
       return null;
+    }
+    if (props.navItem === NAVBAR.Accessibility) {
+      return <AccessibilityPane />;
     }
     if (props.view) {
       switch (props.navItem) {
