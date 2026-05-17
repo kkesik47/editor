@@ -12,7 +12,7 @@
  * to be perceptually uniform — equal numeric differences correspond
  * to roughly equal perceived differences.
  *
- * Three checks are performed:
+ * Four checks are performed, depending on the scale shape:
  *
  *   Categorical scales → all pairs must have ΔL* ≥ 20.
  *     If two categories have similar lightness, they become
@@ -25,6 +25,13 @@
  *        Non-monotonic lightness means the perceptual ordering
  *        doesn't match the data ordering — users can't use
  *        brightness to read values reliably.
+ *
+ *   Diverging scales → analysed via `analyzeDivergingLightness`:
+ *     Each half (midpoint→endpoint) is checked independently for
+ *     L* range and monotonicity. A diverging scale is *expected*
+ *     to have non-monotonic global lightness (a V-shape around
+ *     the midpoint), so checking the whole sequence at once would
+ *     always fail.
  */
 
 import {parse, converter, formatHex} from 'culori';
@@ -48,6 +55,16 @@ export const CATEGORICAL_LIGHTNESS_THRESHOLD = 20;
  * close together, producing an unreadable grayscale gradient.
  */
 export const SEQUENTIAL_LIGHTNESS_RANGE_THRESHOLD = 40;
+
+/**
+ * Minimum L* range per half for a diverging scale.
+ *
+ * Each half spans half the data range (midpoint → endpoint), so the
+ * threshold is half of the sequential one. Below 20 L* per half,
+ * that side of the gradient looks nearly flat in grayscale, and
+ * users can't read distance-from-midpoint on that side.
+ */
+export const DIVERGING_HALF_LIGHTNESS_RANGE_THRESHOLD = 20;
 
 /**
  * Minimum ΔL* between consecutive samples to count as a real
@@ -96,6 +113,32 @@ export interface LightnessAnalysisResult {
   isMonotonic: boolean;
   /** Points where lightness reverses direction (empty if monotonic). */
   reversals: LightnessReversal[];
+}
+
+/**
+ * Result of analyzing a diverging scale's lightness profile.
+ *
+ * Each half is reported separately: the "left" half is from the
+ * start of the scale up to and including the midpoint sample;
+ * the "right" half is from the midpoint to the end.
+ */
+export interface DivergingLightnessAnalysisResult {
+  /** L* values for each color in the input array. */
+  lightnessValues: number[];
+  /** Index of the midpoint sample (Math.floor(n / 2)). */
+  midIndex: number;
+  /** |L*(midpoint) − L*(start)|. */
+  leftRange: number;
+  /** |L*(end) − L*(midpoint)|. */
+  rightRange: number;
+  /** Whether the left half progresses monotonically. */
+  leftMonotonic: boolean;
+  /** Whether the right half progresses monotonically. */
+  rightMonotonic: boolean;
+  /** Reversal points within the left half (start → midpoint). */
+  leftReversals: LightnessReversal[];
+  /** Reversal points within the right half (midpoint → end). */
+  rightReversals: LightnessReversal[];
 }
 
 // ─── CIELAB conversion ───────────────────────────────────────────
@@ -183,7 +226,6 @@ function checkMonotonicity(
 
   for (let i = 1; i < lightnessValues.length; i++) {
     const current = lightnessValues[i];
-    const deltaFromExtreme = current - lastExtreme;
 
     if (expectedDirection === 'rising') {
       if (current >= lastExtreme) {
@@ -224,6 +266,10 @@ function checkMonotonicity(
 
 /**
  * Analyze the lightness distribution of a set of colors.
+ *
+ * Used for categorical and sequential scales. For diverging scales,
+ * use `analyzeDivergingLightness` instead, since global monotonicity
+ * does not apply.
  *
  * Extracts CIELAB L* for each color and computes:
  *   - All pairwise ΔL* values (for categorical threshold checks)
@@ -286,5 +332,62 @@ export function analyzeLightness(colors: string[]): LightnessAnalysisResult {
     problematicPairs,
     isMonotonic,
     reversals,
+  };
+}
+
+/**
+ * Analyze the lightness profile of a diverging color scale.
+ *
+ * Diverging scales encode values that move away from a neutral
+ * midpoint in two opposite directions, so their expected lightness
+ * profile is a V-shape (or inverted V): light or dark at the
+ * midpoint, opposite at both endpoints.
+ *
+ * Because of this, global monotonicity always fails for a correctly
+ * designed diverging scale. Instead, we split the samples at the
+ * midpoint and check each half independently for:
+ *   - L* range (each half should span at least DIVERGING_HALF_LIGHTNESS_RANGE_THRESHOLD)
+ *   - Monotonicity (each half should move steadily towards the endpoint)
+ *
+ * Both halves include the midpoint sample, so a kink right at the
+ * centre is caught in both sub-sequences.
+ */
+export function analyzeDivergingLightness(
+  colors: string[],
+): DivergingLightnessAnalysisResult {
+  const lightnessValues: number[] = [];
+
+  for (const color of colors) {
+    const l = extractLightness(color);
+    if (l !== null) lightnessValues.push(l);
+  }
+
+  const n = lightnessValues.length;
+  const midIndex = Math.floor(n / 2);
+
+  // Both halves include the midpoint sample to detect kinks at the centre.
+  const left = lightnessValues.slice(0, midIndex + 1);
+  const right = lightnessValues.slice(midIndex);
+
+  const leftRange = left.length >= 2
+    ? round1(Math.abs(left[left.length - 1] - left[0]))
+    : 0;
+
+  const rightRange = right.length >= 2
+    ? round1(Math.abs(right[right.length - 1] - right[0]))
+    : 0;
+
+  const leftCheck = checkMonotonicity(left);
+  const rightCheck = checkMonotonicity(right);
+
+  return {
+    lightnessValues,
+    midIndex,
+    leftRange,
+    rightRange,
+    leftMonotonic: leftCheck.isMonotonic,
+    rightMonotonic: rightCheck.isMonotonic,
+    leftReversals: leftCheck.reversals,
+    rightReversals: rightCheck.reversals,
   };
 }

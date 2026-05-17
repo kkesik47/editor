@@ -18,14 +18,23 @@ import {scheme as vegaScheme} from 'vega-scale';
 
 // ─── Public types ────────────────────────────────────────────────
 
-/** Whether the scale maps unordered categories or an ordered sequence. */
-export type ScaleType = 'categorical' | 'sequential';
+/**
+ * Three scale shapes, each with a different distinguishability model:
+ *
+ *   categorical → unordered categories; every pair must be distinct.
+ *   sequential  → ordered low→high gradient; brightness must move
+ *                 in one direction across the whole range.
+ *   diverging   → ordered values around a neutral midpoint; brightness
+ *                 is expected to form a V (or inverted V), so each half
+ *                 must be checked independently.
+ */
+export type ScaleType = 'categorical' | 'sequential' | 'diverging';
 
 /** One resolved color scale extracted from a Vega-Lite spec. */
 export interface ResolvedScale {
   /** The concrete CSS color strings the scale will render. */
   colors: string[];
-  /** Categorical → check all pairs; sequential → check adjacent + stride. */
+  /** Categorical / sequential / diverging — controls which checks apply. */
   scaleType: ScaleType;
   /** JSON Pointer to the scale property (for editor underlines). */
   jsonPointer: string;
@@ -54,6 +63,38 @@ const COLOR_CHANNELS = ['color', 'fill', 'stroke'] as const;
  * the stride check meaningful reach.
  */
 const DEFAULT_CONTINUOUS_SAMPLES = 16;
+
+/**
+ * Named Vega/D3 color schemes that are diverging (two-tailed around
+ * a neutral midpoint).  Matched against the base name with any
+ * numeric suffix stripped (e.g. "blueorange-7" → "blueorange").
+ *
+ * Source: https://vega.github.io/vega/docs/schemes/#diverging
+ */
+const DIVERGING_SCHEMES = new Set<string>([
+  'blueorange',
+  'brownbluegreen',
+  'purplegreen',
+  'pinkyellowgreen',
+  'purpleorange',
+  'redblue',
+  'redgrey',
+  'redyellowblue',
+  'redyellowgreen',
+  'spectral',
+]);
+
+/**
+ * Whether a scheme name refers to a diverging palette.
+ *
+ * Strips any trailing "-N" (used for discrete variants like
+ * "blueorange-7") before looking up the base name.
+ */
+function isDivergingScheme(name: unknown): boolean {
+  if (typeof name !== 'string') return false;
+  const base = name.toLowerCase().replace(/-\d+$/, '');
+  return DIVERGING_SCHEMES.has(base);
+}
 
 // ─── Scheme resolution ──────────────────────────────────────────
 
@@ -145,19 +186,50 @@ function resolveDiscreteScheme(schemeValue: unknown[], count?: number): string[]
 // ─── Scale type inference ────────────────────────────────────────
 
 /**
- * Determine whether an encoding channel represents categories or a sequence.
+ * Determine whether an encoding channel represents categories, an
+ * ordered sequence, or a diverging two-tailed scale.
  *
- * Vega-Lite's `type` field is the primary signal:
- *   - "nominal"                      → categorical (unordered)
- *   - "ordinal" / "quantitative" / "temporal" → sequential (ordered)
+ * Priority order:
  *
- * When type is absent, we default to 'categorical' because the all-pairs
- * check is the safer (more conservative) approach.
+ *   1. Nominal field type → categorical, regardless of palette
+ *      (colors are independent labels; a "diverging" palette used
+ *      categorically still produces unordered categories).
+ *
+ *   2. Diverging signals on the scale block → diverging:
+ *        - scale.type === 'diverging'
+ *        - scale.domain is a three-element array [min, mid, max]
+ *        - scale.domainMid is set
+ *        - scale.scheme names a known diverging palette
+ *
+ *   3. Ordered field type (ordinal / quantitative / temporal) → sequential.
+ *
+ *   4. Anything else → categorical (the safer, stricter default).
  */
 function inferScaleType(encodingDef: Record<string, unknown>): ScaleType {
   const fieldType = encodingDef?.type;
 
+  // Nominal fields are always categorical — even with a diverging palette,
+  // the individual categories are unordered and need pairwise checks.
   if (fieldType === 'nominal') return 'categorical';
+
+  const scale = encodingDef?.scale as Record<string, unknown> | undefined;
+
+  if (scale) {
+    if (scale.type === 'diverging') return 'diverging';
+
+    if (Array.isArray(scale.domain) && scale.domain.length === 3) {
+      return 'diverging';
+    }
+
+    if (scale.domainMid != null) return 'diverging';
+
+    const schemeName =
+      typeof scale.scheme === 'string'
+        ? scale.scheme
+        : (scale.scheme as Record<string, unknown> | undefined)?.name;
+    if (isDivergingScheme(schemeName)) return 'diverging';
+  }
+
   if (fieldType === 'ordinal') return 'sequential';
   if (fieldType === 'quantitative') return 'sequential';
   if (fieldType === 'temporal') return 'sequential';

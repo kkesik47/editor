@@ -79,6 +79,16 @@ function estimateTextWidth(text: string, fontSize: number): number {
   return Math.ceil(text.length * fontSize * 0.62);
 }
 
+/**
+ * Whether a scale type should be rendered as a continuous gradient
+ * in the "Normal vs X" preview. Both sequential and diverging scales
+ * are densely-sampled gradients; categorical scales are discrete
+ * swatches.
+ */
+function isGradientScaleType(scaleType: unknown): boolean {
+  return scaleType === 'sequential' || scaleType === 'diverging';
+}
+
 // ─── Shared "Normal vs X" preview builder ────────────────────────
 
 /**
@@ -213,7 +223,7 @@ export function buildCvdPreviewDataUri(issue: AccessibilityIssue): string {
     tritanopia: 'Tritanopia',
   };
   const simLabel = cvdLabels[cvdType as string] ?? 'Simulated';
-  const isContinuous = scaleType === 'sequential';
+  const isContinuous = isGradientScaleType(scaleType);
 
   return buildTwoRowColorPreview(
     originalColors as string[],
@@ -236,7 +246,7 @@ export function buildGrayscalePreviewDataUri(issue: AccessibilityIssue): string 
     return '';
   }
 
-  const isContinuous = scaleType === 'sequential';
+  const isContinuous = isGradientScaleType(scaleType);
 
   return buildTwoRowColorPreview(
     originalColors as string[],
@@ -275,6 +285,14 @@ export function buildUniformityPreviewDataUri(issue: AccessibilityIssue): string
   const colorCount = (evidence.colorCount as number) || 0;
   const domain = evidence.domain as [number, number] | null;
   const fieldName = (evidence.fieldName as string) || null;
+  // For diverging issues, `steps` only covers the failing half.
+  // The full ordered color list (when provided) is used to draw the
+  // gradient bar, so the user still sees the whole scale.
+  const fullScaleColors =
+    Array.isArray(evidence.gradientColors) &&
+    (evidence.gradientColors as unknown[]).every((c) => typeof c === 'string')
+      ? (evidence.gradientColors as string[])
+      : null;
 
   if (!Array.isArray(steps) || steps.length < 2 || colorCount < 2) {
     return '';
@@ -305,9 +323,12 @@ export function buildUniformityPreviewDataUri(issue: AccessibilityIssue): string
   const largestLabel = `Biggest color change (${formatPosition(largest.indexA, largest.indexB)})`;
   const smallestLabel = `Smallest color change (${formatPosition(smallest.indexA, smallest.indexB)})`;
 
-  // Collect all colors for the gradient (colorA of each step + colorB of last)
-  const allColors: string[] = steps.map((s) => s.colorA);
-  allColors.push(steps[steps.length - 1].colorB);
+  // Collect colors for the gradient. For diverging issues we use the
+  // full scale (passed in via evidence.gradientColors) so the user
+  // sees the whole palette in context. For sequential issues we
+  // reconstruct from the step list (which is the whole scale anyway).
+  const allColors: string[] =
+    fullScaleColors ?? [...steps.map((s) => s.colorA), steps[steps.length - 1].colorB];
 
   // ── Layout constants ──
   const labelW = 220;
