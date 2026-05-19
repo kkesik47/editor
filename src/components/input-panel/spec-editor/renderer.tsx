@@ -13,6 +13,7 @@ import ResizeObserver from 'rc-resize-observer';
 import {debounce} from 'vega';
 import parser from 'vega-schema-url-parser';
 import type {AccessibilityIssue} from '../../../features/accessibility/types.js';
+import {resolveIssueReferences} from '../../../features/accessibility/resolveIssueReferences.js';
 
 type MonacoModule = typeof import('monaco-editor');
 
@@ -44,6 +45,42 @@ function isAAASuggestion(issue: AccessibilityIssue): boolean {
 // ─── Issue → decoration / marker conversion ─────────────────────
 
 /**
+ * Append APA-style in-text citations to a message inside the final
+ * sentence, then italicize the whole parenthetical via Markdown.
+ *
+ * The parens are included inside the italics so the citation cluster
+ * reads as one visually-soft block rather than as part of the prose:
+ *
+ *     "...low color vision _(Brettel et al., 1997; Birch, 2012)_."
+ *
+ * When the message ends with a period, citations are inserted BEFORE
+ * the period so the sentence stays grammatical. When it doesn't end
+ * with a period, citations are simply appended.
+ *
+ * Returns the original message unchanged if there are no references.
+ *
+ * NB: this mirrors `appendCitations` in the accessibility pane, but
+ * adds Markdown italic markers because Monaco hovers render Markdown
+ * while the pane renders plain React text. Kept as separate functions
+ * because the wrapping syntax differs — sharing would require either
+ * a "render mode" parameter or post-hoc formatting, both of which
+ * obscure intent at the call sites.
+ */
+function appendCitationsMarkdown(issue: AccessibilityIssue): string {
+  const references = resolveIssueReferences(issue);
+  if (references.length === 0) return issue.message;
+
+  const citations = references.map((r) => r.shortCitation).join('; ');
+  const italicized = `_(${citations})_`;
+  const trimmed = issue.message.trimEnd();
+
+  if (trimmed.endsWith('.')) {
+    return `${trimmed.slice(0, -1)} ${italicized}.`;
+  }
+  return `${trimmed} ${italicized}`;
+}
+
+/**
  * Convert accessibility issues into Monaco editor decorations.
  *
  * Creates wavy underline decorations with hover tooltips for each
@@ -56,12 +93,13 @@ function isAAASuggestion(issue: AccessibilityIssue): boolean {
  * AAA-level issues (suggestions) get a distinct blue-gray underline
  * to visually separate them from mandatory A/AA warnings (yellow).
  *
- * The hover tooltip is intentionally minimal — it shows the severity
- * header, the rule's plain-language message, and a pointer to the
- * Accessibility tab for full details (suggestion text, color previews,
- * grayscale previews, etc.). Keeping the tooltip brief avoids clutter
- * while authors are editing, and lets the dedicated pane host the
- * richer visual content where there's room for it.
+ * The hover tooltip shows the severity header, the rule's plain-
+ * language message with inline italicized APA citations, and a
+ * pointer to the Accessibility tab for full details (suggestion text,
+ * color previews, grayscale previews, clickable DOI links, etc.).
+ * Keeping the tooltip brief avoids clutter while authors are editing,
+ * and lets the dedicated pane host the richer content where there's
+ * room for it.
  */
 function toIssueDecorations(
   issues: AccessibilityIssue[],
@@ -98,14 +136,15 @@ function toIssueDecorations(
       ? `**Accessibility suggestion** (WCAG AAA)`
       : `**Accessibility** (${issue.severity})`;
 
-    // Brief tooltip: header + message + pointer line.
-    // Full details (suggestion, previews) live in the Accessibility tab.
+    // Brief tooltip: header + message-with-italic-citations + footer.
+    // Full details (suggestion, previews, clickable references) live
+    // in the Accessibility tab.
     const hoverParts = [
       header,
       '',
-      issue.message,
+      appendCitationsMarkdown(issue),
       '',
-      '_See the Accessibility tab for details._',
+      'See the Accessibility tab for details.',
     ];
 
     // Pick decoration class based on WCAG level

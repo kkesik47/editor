@@ -30,6 +30,7 @@
  */
 
 import type {AccessibilityIssue, AccessibilityRule} from '../types.js';
+import {WCAG_USE_OF_COLOR, SHARMA_CVD_2023, OSIOBE_2024} from '../references.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -294,7 +295,7 @@ export const colorOnlyEncodingRule: AccessibilityRule = {
     'WCAG 2.1 – 1.4.1 (Use of Color), Level A: checks whether ' +
     'categorical fields encoded to color also have at least one ' +
     'non-color redundant encoding such as shape, strokeDash, or labels.',
-
+  references: [WCAG_USE_OF_COLOR, SHARMA_CVD_2023, OSIOBE_2024],
   evaluate(spec: Record<string, any>): AccessibilityIssue[] {
     const matches: ColorOnlyMatch[] = [];
     walkSpec(spec, '', matches);

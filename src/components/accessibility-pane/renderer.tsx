@@ -1,7 +1,10 @@
 import * as React from 'react';
+import {ChevronDown, ChevronRight} from 'react-feather';
 
-import type {AccessibilityIssue, AccessibilityIssueSeverity} from '../../features/accessibility/types.js';
+import type {AccessibilityIssue} from '../../features/accessibility/types.js';
+import type {Reference} from '../../features/accessibility/references.js';
 import {PREVIEW_BUILDERS} from '../../features/accessibility/previewSvgs.js';
+import {resolveIssueReferences} from '../../features/accessibility/resolveIssueReferences.js';
 import './index.css';
 
 interface AccessibilityPaneRendererProps {
@@ -49,12 +52,71 @@ function issueKey(issue: AccessibilityIssue, index: number): string {
 // ─── Sub-components ──────────────────────────────────────────────
 
 /**
+ * Collapsible "References" section listing the full APA citations
+ * with clickable DOI links.
+ *
+ * The collapsed state is just "References (N) ▸" — the inline
+ * citations already appear in the message above, so the toggle
+ * doesn't need to repeat the short citations. Expanding reveals
+ * the full bibliographic entries with type badges and links
+ * opening in a new tab.
+ *
+ * Renders nothing when there are no references, so cards stay
+ * visually clean for any rule that doesn't have scholarly backing.
+ */
+function IssueReferences({references}: {references: Reference[]}) {
+  const [expanded, setExpanded] = React.useState(false);
+
+  if (references.length === 0) return null;
+
+  const Chevron = expanded ? ChevronDown : ChevronRight;
+
+  return (
+    <div className="a11y-issue-references">
+      <button
+        type="button"
+        className="a11y-issue-references-toggle"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Hide reference details' : 'Show reference details'}
+      >
+        <Chevron size={12} aria-hidden="true" />
+        <span className="a11y-issue-references-summary">References ({references.length})</span>
+      </button>
+      {expanded && (
+        <ul className="a11y-issue-references-list">
+          {references.map((ref) => (
+            <li key={ref.id} className="a11y-issue-reference">
+              <a
+                href={ref.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="a11y-issue-reference-link"
+              >
+                {ref.fullCitation}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
  * One issue card. Shows JSON pointer + rule ID at the top, the message
- * and suggestion as prose, and any applicable preview SVGs underneath.
+ * with inline APA citations, the suggestion, any applicable preview
+ * SVGs, and a collapsible "References" section listing full citations
+ * with clickable DOI links.
  */
 function IssueCard({issue}: {issue: AccessibilityIssue}) {
   const severityClass =
     issue.severity === 'warning' || issue.severity === 'error' ? 'severity-warning' : 'severity-info';
+
+  // Resolved once and threaded both into the message (as inline
+  // citations) and into the IssueReferences component (for the
+  // expandable full-citation list).
+  const references = resolveIssueReferences(issue);
 
   // Collect any previews that apply to this issue. `PREVIEW_BUILDERS`
   // returns an empty string when the issue doesn't match a given
@@ -82,6 +144,7 @@ function IssueCard({issue}: {issue: AccessibilityIssue}) {
           ))}
         </div>
       )}
+      <IssueReferences references={references} />
     </li>
   );
 }

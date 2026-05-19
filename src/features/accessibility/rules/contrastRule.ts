@@ -38,6 +38,7 @@ import {
   type MarkContrastEntry,
   type ScaleContrastResult,
 } from './contrastAnalysis.js';
+import {WCAG_CONTRAST_MIN, WCAG_CONTRAST_ENHANCED, WCAG_NON_TEXT_CONTRAST} from '../references.js';
 
 // ─── Issue builders ──────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ function buildTextAAIssue(
           `to achieve at least ${TEXT_AA_THRESHOLD}:1 contrast.`,
 
     jsonPointer: entry.jsonPointer,
-
+    references: [WCAG_CONTRAST_MIN],
     evidence: {
       wcagLevel: 'AA',
       wcagCriterion: '1.4.3',
@@ -124,7 +125,7 @@ function buildTextAAAIssue(
       `the background.`,
 
     jsonPointer: entry.jsonPointer,
-
+    references: [WCAG_CONTRAST_ENHANCED],
     evidence: {
       wcagLevel: 'AAA',
       wcagCriterion: '1.4.6',
@@ -168,7 +169,7 @@ function buildMarkAAIssue(
       `to achieve at least ${NON_TEXT_AA_THRESHOLD}:1 contrast.`,
 
     jsonPointer: entry.jsonPointer,
-
+    references: [WCAG_NON_TEXT_CONTRAST],
     evidence: {
       wcagLevel: 'AA',
       wcagCriterion: '1.4.11',
@@ -250,7 +251,7 @@ export const contrastRule: AccessibilityRule = {
     '(AA) or ≥ 7:1 (AAA) against the background; non-text graphical ' +
     'elements need ≥ 3:1 (AA). Scale contrast is only checked for ' +
     'categorical scales.',
-
+   references: [WCAG_CONTRAST_MIN, WCAG_CONTRAST_ENHANCED, WCAG_NON_TEXT_CONTRAST],
   evaluate(spec: Record<string, any>): AccessibilityIssue[] {
     const result = analyzeContrast(spec);
     const bg = result.backgroundColor;

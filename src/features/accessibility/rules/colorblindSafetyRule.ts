@@ -30,6 +30,7 @@ import {
   SEQUENTIAL_DISTANT_THRESHOLD,
 } from './colorblindSafety/cvdSimulation.js';
 import { debugCvdDeltaE } from './colorblindSafety/cvdSimulation.js';
+import {BRETTEL_1997, MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018} from '../references.js';
 
 // ─── Human-readable names for CVD types ──────────────────────────
 
@@ -126,7 +127,7 @@ export const colorblindSafetyRule: AccessibilityRule = {
     'Simulates color vision deficiencies (protanopia, deuteranopia, ' +
     'tritanopia) on explicit color scales and checks whether the ' +
     'colors remain perceptually distinguishable using CIEDE2000.',
-
+  references: [BRETTEL_1997, MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018],
   evaluate(spec: Record<string, unknown>): AccessibilityIssue[] {
     // Step 1: Find all explicit color scales and resolve them to colors
     const scales = resolveScaleColors(spec);

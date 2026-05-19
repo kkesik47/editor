@@ -27,6 +27,7 @@ import {
   analyzeFontSizes,
   type FontSizeEntry,
 } from './fontSizeAnalysis.js';
+import {LEGGE_BIGELOW_2011, RELLO_2016} from '../references.js';
 
 // ─── Issue builder ───────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export const fontSizeRule: AccessibilityRule = {
     'Checks whether text elements (titles, axis labels, legend labels) ' +
     'meet minimum font size thresholds for readability. ' +
     'Titles require ≥ 16 px; labels require ≥ 13 px.',
-
+  references: [LEGGE_BIGELOW_2011, RELLO_2016],
   evaluate(spec: Record<string, any>): AccessibilityIssue[] {
     const result = analyzeFontSizes(spec);
     return result.issues.map(buildIssue);

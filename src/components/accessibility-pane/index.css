@@ -145,6 +145,73 @@
   display: block;
 }
 
+/* ── References footer ─────────────────────────────────────────── */
+
+/* Collapsible "References (N)" toggle that opens to show full APA
+ * citations with DOI links. Visually separated from the body with a
+ * dashed top rule so it reads as ancillary detail, not part of the
+ * suggestion. */
+.accessibility-pane .a11y-issue-references {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--gray-color);
+}
+
+.accessibility-pane .a11y-issue-references-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-align: left;
+  font-family: var(--base-font-family);
+  color: var(--extra-dark-gray-color);
+  line-height: 1.4;
+}
+
+.accessibility-pane .a11y-issue-references-toggle:hover {
+  color: black;
+}
+
+.accessibility-pane .a11y-issue-references-toggle:focus-visible {
+  outline: 2px solid #1c8ae4;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.accessibility-pane .a11y-issue-references-summary {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.accessibility-pane .a11y-issue-references-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.accessibility-pane .a11y-issue-reference {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #333;
+  padding-left: 9px;
+}
+
+.accessibility-pane .a11y-issue-reference-link {
+  color: #1c8ae4;
+  text-decoration: none;
+}
+
+.accessibility-pane .a11y-issue-reference-link:hover,
+.accessibility-pane .a11y-issue-reference-link:focus-visible {
+  text-decoration: underline;
+}
+
 /* Empty state */
 
 .accessibility-pane .a11y-empty {

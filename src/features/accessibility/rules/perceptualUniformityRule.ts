@@ -51,7 +51,7 @@ import {
   MAX_MIN_RATIO_THRESHOLD,
   MAX_MIN_RATIO_HALF_THRESHOLD,
 } from './perceptualUniformityAnalysis.js';
-
+import {BORLAND_TAYLOR_2007, CRAMERI_2020, NUNEZ_2018, SHARMA_CIEDE_2005, BERGMAN_1995} from '../references.js';
 // ─── Domain resolution ───────────────────────────────────────────
 
 /** Domain and field info for a color encoding channel. */
@@ -521,7 +521,7 @@ export const perceptualUniformityRule: AccessibilityRule = {
     'perceptually uniform steps using CIEDE2000 between consecutive ' +
     'colors. Diverging scales are checked per-half so the V-shape ' +
     'around the midpoint is not counted as a defect.',
-
+  references: [BORLAND_TAYLOR_2007, CRAMERI_2020, NUNEZ_2018, SHARMA_CIEDE_2005, BERGMAN_1995],
   evaluate(spec: Record<string, any>): AccessibilityIssue[] {
     const scales = resolveScaleColors(spec);
     const issues: AccessibilityIssue[] = [];

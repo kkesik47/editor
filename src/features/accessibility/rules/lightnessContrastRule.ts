@@ -39,6 +39,7 @@ import {
   SEQUENTIAL_LIGHTNESS_RANGE_THRESHOLD,
   DIVERGING_HALF_LIGHTNESS_RANGE_THRESHOLD,
 } from './lightnessAnalysis.js';
+import {MORELAND_2009, CRAMERI_2020, BERGMAN_1995} from '../references.js';
 
 // ─── Issue builders: categorical & sequential ───────────────────
 
@@ -314,6 +315,7 @@ export const lightnessContrastRule: AccessibilityRule = {
     'for range and monotonicity (their lightness is expected to form ' +
     'a V around the midpoint).',
 
+  references: [MORELAND_2009, CRAMERI_2020, BERGMAN_1995],
   evaluate(spec: Record<string, unknown>): AccessibilityIssue[] {
     const scales = resolveScaleColors(spec);
     const issues: AccessibilityIssue[] = [];
