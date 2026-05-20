@@ -132,7 +132,7 @@
 /* Previews */
 
 .accessibility-pane .a11y-issue-previews {
-  margin-top: 10px;
+  margin-top: 5px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -203,7 +203,6 @@
 }
 
 .accessibility-pane .a11y-issue-reference-link {
-  color: #1c8ae4;
   text-decoration: none;
 }
 
@@ -234,4 +233,69 @@
   font-weight: 450;
   margin: 0;
   color: #1a1919;
+}
+
+/* Recommendations — actionable fix buttons */
+
+.accessibility-pane .a11y-issue-recommendations {
+  margin-top: 5px;
+}
+
+.accessibility-pane .a11y-issue-recommendations-header {
+  font-family: var(--base-font-family);
+  margin: 0;
+  color: rgb(0, 0, 0);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 10px 0;
+}
+
+.accessibility-pane .a11y-recommendation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accessibility-pane .a11y-recommendation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px;
+  background: #f2f7fd;
+  border: 0.5px solid #cfe2f7;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--base-font-family);
+  line-height: 1.4;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.accessibility-pane .a11y-recommendation:hover {
+  background: #e3eefc;
+  border-color: #1c8ae4;
+}
+
+.accessibility-pane .a11y-recommendation:focus-visible {
+  outline: 2px solid #1c8ae4;
+  outline-offset: 1px;
+}
+
+.accessibility-pane .a11y-recommendation-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0c4a8e;
+}
+
+.accessibility-pane .a11y-recommendation-description {
+  font-family: var(--base-font-family);
+  font-size: 12px;
+  font-weight: 450;
+  color: #333;
 }

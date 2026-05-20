@@ -7,3 +7,4 @@ export * from './rules/fontSizeRule.js';
 export * from './rules/contrastRule.js';
 export * from './rules/colorOnlyEncodingRule.js';
 export * from './rules/perceptualUniformityRule.js';
+export * from './recommendations/index.js';

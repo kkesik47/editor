@@ -1,10 +1,19 @@
 import * as React from 'react';
 import {ChevronDown, ChevronRight} from 'react-feather';
+import stringify from 'json-stringify-pretty-compact';
+import {parse as parseJSONC} from 'jsonc-parser';
 
 import type {AccessibilityIssue} from '../../features/accessibility/types.js';
 import type {Reference} from '../../features/accessibility/references.js';
 import {PREVIEW_BUILDERS} from '../../features/accessibility/previewSvgs.js';
 import {resolveIssueReferences} from '../../features/accessibility/resolveIssueReferences.js';
+import {
+  getApplicableRecommendations,
+  describeCvdRecommendation,
+  type Recommendation,
+  type VegaLiteSpec,
+} from '../../features/accessibility/recommendations/index.js';
+import {useAppContext} from '../../context/app-context.js';
 import './index.css';
 
 interface AccessibilityPaneRendererProps {
@@ -104,12 +113,66 @@ function IssueReferences({references}: {references: Reference[]}) {
 }
 
 /**
- * One issue card. Shows JSON pointer + rule ID at the top, the message
- * with inline APA citations, the suggestion, any applicable preview
- * SVGs, and a collapsible "References" section listing full citations
- * with clickable DOI links.
+ * Recommendations section — actionable, machine-applicable fixes.
+ *
+ * Each recommendation is rendered as a button with a label and a
+ * trade-off description. Clicking applies the fix to a clone of the
+ * current spec and pushes the result back to the editor, which
+ * triggers a re-parse and a re-run of the accessibility evaluator.
+ *
+ * Renders nothing when no recommendations apply, so cards for rules
+ * without registered recommendations look the same as before.
  */
-function IssueCard({issue}: {issue: AccessibilityIssue}) {
+function IssueRecommendations({
+  issue,
+  recommendations,
+  onApply,
+}: {
+  issue: AccessibilityIssue;
+  recommendations: Recommendation[];
+  onApply: (rec: Recommendation, issue: AccessibilityIssue) => void;
+}) {
+  if (recommendations.length === 0) return null;
+
+  return (
+    <div className="a11y-issue-recommendations">
+      <h4 className="a11y-issue-recommendations-header">Recommendations:</h4>
+      <ul className="a11y-recommendation-list">
+        {recommendations.map((rec) => (
+          <li key={rec.id}>
+            <button
+              type="button"
+              className="a11y-recommendation"
+              onClick={() => onApply(rec, issue)}
+            >
+              <strong className="a11y-recommendation-label">{rec.label}</strong>
+              <span className="a11y-recommendation-description">
+                {describeCvdRecommendation(rec, issue)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * One issue card. Shows JSON pointer + rule ID at the top, the message
+ * with inline APA citations, the suggestion, the actionable
+ * recommendations (if any), any applicable preview SVGs, and a
+ * collapsible "References" section listing full citations with
+ * clickable DOI links.
+ */
+function IssueCard({
+  issue,
+  recommendations,
+  onApplyRecommendation,
+}: {
+  issue: AccessibilityIssue;
+  recommendations: Recommendation[];
+  onApplyRecommendation: (rec: Recommendation, issue: AccessibilityIssue) => void;
+}) {
   const severityClass =
     issue.severity === 'warning' || issue.severity === 'error' ? 'severity-warning' : 'severity-info';
 
@@ -132,11 +195,6 @@ function IssueCard({issue}: {issue: AccessibilityIssue}) {
         <span className="a11y-issue-rule-id">{issue.ruleId}</span>
       </div>
       <p className="a11y-issue-message">{issue.message}</p>
-      {issue.suggestion && (
-        <p className="a11y-issue-suggestion">
-          <strong>Suggestion:</strong> {issue.suggestion}
-        </p>
-      )}
       {previews.length > 0 && (
         <div className="a11y-issue-previews">
           {previews.map(({key, alt, src}) => (
@@ -144,6 +202,17 @@ function IssueCard({issue}: {issue: AccessibilityIssue}) {
           ))}
         </div>
       )}
+      {/* {issue.suggestion && (
+        <p className="a11y-issue-suggestion">
+          <strong>Suggestion:</strong> {issue.suggestion}
+        </p>
+      )} */}
+      <IssueRecommendations
+        issue={issue}
+        recommendations={recommendations}
+        onApply={onApplyRecommendation}
+      />
+      
       <IssueReferences references={references} />
     </li>
   );
@@ -190,7 +259,72 @@ function EmptyState() {
 // ─── Main component ──────────────────────────────────────────────
 
 const AccessibilityPaneRenderer: React.FC<AccessibilityPaneRendererProps> = ({issues}) => {
+  const {state, setState} = useAppContext();
   const {warnings, suggestions} = partitionBySeverity(issues);
+
+  // ── Parse the current editor spec once per render ─────────────
+  //
+  // We need the parsed spec to (a) ask which recommendations apply
+  // and (b) hand it to a recommendation's apply() function. Parsing
+  // it once at the top is cheaper than re-parsing inside every
+  // IssueCard and keeps the parse-error logging in one place.
+  const currentSpec: VegaLiteSpec | null = React.useMemo(() => {
+    if (!state.editorString) {
+      // eslint-disable-next-line no-console
+      console.debug('[a11y-recs] editorString is empty');
+      return null;
+    }
+    try {
+      const parsed = parseJSONC(state.editorString) as VegaLiteSpec;
+      return parsed;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.debug('[a11y-recs] failed to parse editorString', err);
+      return null;
+    }
+  }, [state.editorString]);
+
+  // ── Apply a recommendation: clone, mutate, push back to editor ─
+  //
+  // The recommendation's apply() function returns a NEW spec object;
+  // we stringify it with the same pretty-printer the rest of the app
+  // uses and set both editorString and parse=true so the existing
+  // pipeline re-evaluates everything (issues, decorations, markers).
+  const applyRecommendation = React.useCallback(
+    (rec: Recommendation, issue: AccessibilityIssue) => {
+      if (!currentSpec) {
+        // eslint-disable-next-line no-console
+        console.warn('[a11y-recs] cannot apply: no parsed spec');
+        return;
+      }
+      try {
+        const newSpec = rec.apply(issue, currentSpec);
+        const newString = stringify(newSpec);
+        setState((s) => ({...s, editorString: newString, parse: true}));
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[a11y-recs] apply failed', err);
+      }
+    },
+    [currentSpec, setState],
+  );
+
+  // ── Pre-compute recommendations per issue ─────────────────────
+  //
+  // Done at this level so each IssueCard receives its list as a
+  // prop instead of re-running the lookup on every render.
+  const recommendationsByKey = React.useMemo(() => {
+    const map = new Map<string, Recommendation[]>();
+    if (!currentSpec) return map;
+
+    [...warnings, ...suggestions].forEach((issue, i) => {
+      const key = issueKey(issue, i);
+      const recs = getApplicableRecommendations(issue, currentSpec);
+      map.set(key, recs);
+    });
+
+    return map;
+  }, [warnings, suggestions, currentSpec]);
 
   if (warnings.length === 0 && suggestions.length === 0) {
     return (
@@ -206,9 +340,17 @@ const AccessibilityPaneRenderer: React.FC<AccessibilityPaneRendererProps> = ({is
         <section className="a11y-section">
           <SectionHeaderWarning title="Warnings" count={warnings.length} />
           <ul className="a11y-issue-list">
-            {warnings.map((issue, i) => (
-              <IssueCard key={issueKey(issue, i)} issue={issue} />
-            ))}
+            {warnings.map((issue, i) => {
+              const key = issueKey(issue, i);
+              return (
+                <IssueCard
+                  key={key}
+                  issue={issue}
+                  recommendations={recommendationsByKey.get(key) ?? []}
+                  onApplyRecommendation={applyRecommendation}
+                />
+              );
+            })}
           </ul>
         </section>
       )}
@@ -216,9 +358,18 @@ const AccessibilityPaneRenderer: React.FC<AccessibilityPaneRendererProps> = ({is
         <section className="a11y-section">
           <SectionHeaderSuggestion title="Suggestions" count={suggestions.length} />
           <ul className="a11y-issue-list">
-            {suggestions.map((issue, i) => (
-              <IssueCard key={issueKey(issue, i)} issue={issue} />
-            ))}
+            {suggestions.map((issue, i) => {
+              // Offset the index so warning/suggestion keys never collide.
+              const key = issueKey(issue, warnings.length + i);
+              return (
+                <IssueCard
+                  key={key}
+                  issue={issue}
+                  recommendations={recommendationsByKey.get(key) ?? []}
+                  onApplyRecommendation={applyRecommendation}
+                />
+              );
+            })}
           </ul>
         </section>
       )}
