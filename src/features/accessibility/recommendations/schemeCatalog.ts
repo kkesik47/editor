@@ -69,13 +69,6 @@ export const SCHEME_CATALOG: SchemeEntry[] = [
     notes: 'Muted ColorBrewer palette, good for non-vibrant designs.',
   },
   {
-    name: 'dark2',
-    type: 'categorical',
-    hueFamily: 'multi',
-    cvdSafe: true,
-    notes: 'Higher-saturation ColorBrewer palette.',
-  },
-  {
     name: 'accent',
     type: 'categorical',
     hueFamily: 'multi',

@@ -5,64 +5,49 @@
  *
  * Design principle: PLURAL, NAMED REPLACEMENTS.
  *
- * Each recommendation targets a specific scheme rather than a generic
- * "switch to a CVD-safe palette". This is the conceptual contribution
- * of the recommendation engine: instead of the tool quietly picking a
- * replacement based on its own heuristics, the author sees every
- * applicable option side-by-side and makes the trade-off explicitly.
- *
- * For a sequential rainbow scale, the author sees BOTH:
- *   - Switch to viridis  (sacrifices the rainbow look entirely)
- *   - Switch to turbo    (preserves the rainbow look, still CVD-safe)
- * …and chooses based on whether they care about preserving rainbow.
+ * Each recommendation targets a specific palette rather than a generic
+ * "switch to a CVD-safe palette". The author sees every applicable
+ * option side-by-side and makes the trade-off explicitly, instead of
+ * the tool quietly picking a replacement based on its own heuristics.
  *
  * Recommendations are grouped by scale type. Within each group every
- * recommendation is a "replacement" family strategy. Future additions
- * (adjustment, redundancy, augmentation, restructure) will populate
- * the other families.
+ * recommendation is a "replacement" family strategy.
  *
  * Sequential schemes (5):
- *   - swapToViridis  (default; perceptually uniform, neutral default)
+ *   - swapToViridis  (default; perceptually uniform, neutral)
  *   - swapToCividis  (designed to look the same to CVD and non-CVD viewers)
  *   - swapToTurbo    (only when original is rainbow-like; preserves rainbow)
  *   - swapToMagma    (only when original is warm; preserves warm hue)
  *   - swapToPlasma   (only when original is warm; magenta-yellow progression)
  *
- * Categorical schemes (4):
- *   - swapToTableau10
- *   - swapToSet2
- *   - swapToDark2
- *   - swapToObservable10
+ * Categorical schemes / palettes (6):
+ *   - Vega-registered schemes (set via scale.scheme):
+ *     swapToTableau10, swapToSet2, swapToDark2, swapToObservable10
+ *   - Hand-picked, guaranteed-safe palettes (set via scale.range):
+ *     swapToOkabeIto  — the de-facto CVD-safe standard (8 colors)
+ *     swapToWong      — Nature Methods recommendation (7 colors)
+ *
+ *   The hand-picked palettes are added so that authors with small
+ *   categorical scales (2–8 categories) get a guaranteed-safe option
+ *   even when the standard schemes have problematic far-pair confusions
+ *   that don't affect their visualization at the current category count.
  *
  * Diverging schemes (3):
- *   - swapToBlueOrange   (CVD-safest; uses CVD-preserved axis)
- *   - swapToRedBlue      (classic diverging)
- *   - swapToPurpleOrange (purple-orange diverging)
- *
- * Special case — rainbow-like diverging (spectral):
- *   `spectral` is classified as diverging by scheme name in
- *   `resolveScaleColors.ts`, but many authors who reach for spectral
- *   actually want a rainbow sequential, not a true diverging palette.
- *   So when the original is spectral, the SEQUENTIAL turbo/viridis
- *   recommendations are ALSO offered, giving the author a path away
- *   from spectral that doesn't force them into another diverging scheme.
+ *   - swapToBlueOrange, swapToRedBlue, swapToPurpleOrange
  */
 
 import type {AccessibilityIssue} from '../types.js';
-import type {Recommendation} from './types.js';
-import {setScheme, parentPointer} from './specMutators.js';
+import type {Recommendation, VegaLiteSpec} from './types.js';
+import {setScheme, setRange, parentPointer} from './specMutators.js';
 import {findScheme} from './schemeCatalog.js';
 
 // ─── Shared evidence reader ─────────────────────────────────────
 
-/**
- * The slice of `issue.evidence` we actually read here. Kept loose
- * because the rule produces a richer evidence object — we only
- * consume what recommendations need.
- */
 interface CvdEvidence {
   scaleType: 'categorical' | 'sequential' | 'diverging';
   schemeName: string | null;
+  /** Optional: how many categories the data actually uses. */
+  usedCategoryCount: number | null;
 }
 
 function readCvdEvidence(issue: AccessibilityIssue): CvdEvidence | null {
@@ -79,43 +64,74 @@ function readCvdEvidence(issue: AccessibilityIssue): CvdEvidence | null {
   }
 
   const schemeName = typeof e.schemeName === 'string' ? e.schemeName : null;
-  return {scaleType, schemeName};
+  const usedCategoryCount =
+    typeof e.usedCategoryCount === 'number' ? e.usedCategoryCount : null;
+  return {scaleType, schemeName, usedCategoryCount};
 }
 
-/**
- * Whether the original scheme reads as "rainbow-like" (rainbow,
- * sinebow, spectral). When true, we offer recommendations that
- * preserve the rainbow aesthetic (turbo) and also surface sequential
- * alternatives even when the spec is technically diverging.
- */
 function isRainbowLikeOriginal(evidence: CvdEvidence): boolean {
   if (!evidence.schemeName) return false;
   const scheme = findScheme(evidence.schemeName);
   return scheme?.hueFamily === 'rainbow-like';
 }
 
-/**
- * Whether the original scheme reads as "warm" (reds/oranges palette).
- * Used to gate magma/plasma recommendations so they only appear when
- * the author was clearly going for a warm aesthetic.
- */
 function isWarmOriginal(evidence: CvdEvidence): boolean {
   if (!evidence.schemeName) return false;
   const scheme = findScheme(evidence.schemeName);
   return scheme?.hueFamily === 'warm';
 }
 
-// ─── Helper factory ─────────────────────────────────────────────
+// ─── Hand-picked CVD-safe palettes ──────────────────────────────
 
 /**
- * Build a "swap to a specific scheme" recommendation.
+ * Okabe & Ito (2008) categorical palette.
  *
- * All scheme-swap recommendations have the same shape — only the
- * target scheme, applicability rule, and description differ. The
- * factory removes the boilerplate.
+ * Designed specifically for color vision deficiency, this palette has
+ * become the de-facto standard for CVD-safe categorical encoding in
+ * scientific visualization. Eight colors, every pair distinguishable
+ * under protanopia, deuteranopia, and tritanopia.
  *
- * The `applies` callback receives the parsed CVD evidence and
- * returns whether this recommendation should appear for the issue.
+ * Reference: Okabe, M. & Ito, K. (2008). "Color Universal Design (CUD)".
+ *   https://jfly.uni-koeln.de/color/
+ */
+const OKABE_ITO: string[] = [
+  '#000000', // black
+  '#E69F00', // orange
+  '#56B4E9', // sky blue
+  '#009E73', // bluish green
+  '#F0E442', // yellow
+  '#0072B2', // blue
+  '#D55E00', // vermillion
+  '#CC79A7', // reddish purple
+];
+
+/**
+ * Wong (2011) categorical palette (Nature Methods).
+ *
+ * Seven-color palette from the influential Nature Methods column
+ * "Points of view: Color blindness". Slightly more muted than
+ * Okabe-Ito but with the same CVD-safety guarantees.
+ *
+ * Reference: Wong, B. (2011). "Color blindness". Nature Methods 8, 441.
+ *   https://doi.org/10.1038/nmeth.1618
+ */
+const WONG: string[] = [
+  '#000000', // black
+  '#E69F00', // orange
+  '#56B4E9', // sky blue
+  '#009E73', // bluish green
+  '#F0E442', // yellow
+  '#0072B2', // blue
+  '#D55E00', // vermillion
+];
+
+// ─── Helper factories ───────────────────────────────────────────
+
+/**
+ * Build a "swap to a Vega-registered scheme" recommendation.
+ *
+ * Used for schemes like viridis, tableau10 — anything in Vega's
+ * scheme registry that can be referenced by `scale.scheme: "name"`.
  */
 function buildSchemeSwap(args: {
   id: string;
@@ -133,13 +149,59 @@ function buildSchemeSwap(args: {
     applicableWhen(issue) {
       const evidence = readCvdEvidence(issue);
       if (!evidence) return false;
-      // Don't recommend the scheme that's already in use.
       if (evidence.schemeName?.toLowerCase() === args.schemeName) return false;
       return args.applies(evidence);
     },
 
     apply(issue, spec) {
       return setScheme(spec, parentPointer(issue.jsonPointer), args.schemeName);
+    },
+  };
+}
+
+/**
+ * Build a "swap to an explicit range" recommendation.
+ *
+ * Used for hand-picked palettes (Okabe-Ito, Wong) that aren't
+ * registered as Vega schemes and have to be applied as an explicit
+ * `scale.range` array.
+ *
+ * The palette is sliced to the actual category count when available,
+ * so a 3-category chart gets the first 3 Okabe-Ito colors, not all 8.
+ * This keeps the spec tidy and avoids dropping unused colors into the
+ * user's source.
+ */
+function buildRangeSwap(args: {
+  id: string;
+  label: string;
+  description: string;
+  palette: string[];
+  applies: (evidence: CvdEvidence) => boolean;
+}): Recommendation {
+  return {
+    id: args.id,
+    label: args.label,
+    description: args.description,
+    family: 'replacement',
+
+    applicableWhen(issue) {
+      const evidence = readCvdEvidence(issue);
+      if (!evidence) return false;
+      // Don't offer a palette that has fewer colors than the data needs.
+      if (
+        evidence.usedCategoryCount != null &&
+        evidence.usedCategoryCount > args.palette.length
+      ) {
+        return false;
+      }
+      return args.applies(evidence);
+    },
+
+    apply(issue, spec) {
+      const evidence = readCvdEvidence(issue);
+      const count = evidence?.usedCategoryCount ?? args.palette.length;
+      const slice = args.palette.slice(0, count);
+      return setRange(spec, parentPointer(issue.jsonPointer), slice);
     },
   };
 }
@@ -154,11 +216,7 @@ export const swapToViridis = buildSchemeSwap({
     'default — sacrifices any specific hue feel for the most defensible ' +
     'accessibility profile.',
   schemeName: 'viridis',
-  applies: (evidence) =>
-    evidence.scaleType === 'sequential' ||
-    // Spectral acts as a rainbow sequential for most authors,
-    // so we also offer sequential alternatives.
-    (evidence.scaleType === 'diverging' && isRainbowLikeOriginal(evidence)),
+  applies: (evidence) => evidence.scaleType === 'sequential',
 });
 
 export const swapToCividis = buildSchemeSwap({
@@ -169,26 +227,19 @@ export const swapToCividis = buildSchemeSwap({
     'nearly the same scale. Best when you want a single palette that ' +
     'works equivalently for all readers.',
   schemeName: 'cividis',
-  applies: (evidence) =>
-    evidence.scaleType === 'sequential' ||
-    (evidence.scaleType === 'diverging' && isRainbowLikeOriginal(evidence)),
+  applies: (evidence) => evidence.scaleType === 'sequential',
 });
 
 export const swapToTurbo = buildSchemeSwap({
   id: 'cvd-swap-to-turbo',
   label: 'Switch to turbo',
   description:
-    'CVD improved rainbow. Preserves the rainbow look and ' +
+    'Perceptually improved rainbow. Preserves the rainbow look and ' +
     'high dynamic range while being substantially safer under simulated ' +
     'color vision deficiencies than classic rainbow.',
   schemeName: 'turbo',
   applies: (evidence) =>
-    // Sequential context: only offered when the original was rainbow-like.
-    // (For non-rainbow sequentials, viridis/cividis are better defaults.)
-    (evidence.scaleType === 'sequential' && isRainbowLikeOriginal(evidence)) ||
-    // Diverging spectral: same reasoning — most spectral users want
-    // a rainbow sequential, and turbo is the rainbow sequential.
-    (evidence.scaleType === 'diverging' && isRainbowLikeOriginal(evidence)),
+    evidence.scaleType === 'sequential' && isRainbowLikeOriginal(evidence),
 });
 
 export const swapToMagma = buildSchemeSwap({
@@ -221,21 +272,41 @@ export const swapToTableau10 = buildSchemeSwap({
   id: 'cvd-swap-to-tableau10',
   label: 'Switch to tableau10',
   description:
-    'Tableau\'s standard categorical palette. Designed for strong ' +
+    "Tableau's standard categorical palette. Designed for strong " +
     'discriminability under simulated color vision deficiencies. ' +
     'Good neutral default for most categorical encodings.',
   schemeName: 'tableau10',
   applies: (evidence) => evidence.scaleType === 'categorical',
 });
 
+/**
+ * Maximum number of categories at which set2 stays CVD-safe.
+ *
+ * set2 is a muted ColorBrewer palette that is safe at low category
+ * counts but develops a protanopia-confusable pair once five or more
+ * of its colours are in play. We only offer it when the data uses few
+ * enough categories that it won't simply re-trigger the same warning.
+ * Past this count, the guaranteed-safe palettes (Okabe-Ito, Wong) and
+ * the more robust schemes (tableau10, dark2, observable10) are better
+ * recommendations.
+ */
+const SET2_SAFE_CATEGORY_LIMIT = 4;
+
 export const swapToSet2 = buildSchemeSwap({
   id: 'cvd-swap-to-set2',
   label: 'Switch to set2',
   description:
-    'Muted ColorBrewer categorical palette. Best when the original ' +
-    'design was non-vibrant and a softer palette fits the visual tone.',
+    'Muted ColorBrewer categorical palette, CVD-safe up to about four ' +
+    'categories. Best when the original design was non-vibrant and a ' +
+    'softer palette fits the visual tone.',
   schemeName: 'set2',
-  applies: (evidence) => evidence.scaleType === 'categorical',
+  applies: (evidence) =>
+    evidence.scaleType === 'categorical' &&
+    // Only offer set2 when we know the count is small enough for it to
+    // be safe. When the count is unknown (e.g. data from a URL), we err
+    // on the side of NOT recommending it, since it would often re-fail.
+    evidence.usedCategoryCount != null &&
+    evidence.usedCategoryCount <= SET2_SAFE_CATEGORY_LIMIT,
 });
 
 export const swapToDark2 = buildSchemeSwap({
@@ -256,6 +327,28 @@ export const swapToObservable10 = buildSchemeSwap({
     "Observable's default categorical palette. Modern, well-balanced " +
     'between vibrancy and discriminability under CVD.',
   schemeName: 'observable10',
+  applies: (evidence) => evidence.scaleType === 'categorical',
+});
+
+export const swapToOkabeIto = buildRangeSwap({
+  id: 'cvd-swap-to-okabe-ito',
+  label: 'Switch to Okabe-Ito',
+  description:
+    'Hand-picked 8-colour palette designed specifically for color ' +
+    'vision deficiency (Okabe & Ito, 2008). The de-facto standard for ' +
+    'CVD-safe categorical visualization in scientific publications.',
+  palette: OKABE_ITO,
+  applies: (evidence) => evidence.scaleType === 'categorical',
+});
+
+export const swapToWong = buildRangeSwap({
+  id: 'cvd-swap-to-wong',
+  label: 'Switch to Wong palette',
+  description:
+    'Hand-picked 7-colour palette from Nature Methods (Wong, 2011). ' +
+    'Slightly more muted than Okabe-Ito with the same CVD-safety ' +
+    'guarantees. Good for academic / publication-style figures.',
+  palette: WONG,
   applies: (evidence) => evidence.scaleType === 'categorical',
 });
 
@@ -296,34 +389,21 @@ export const swapToPurpleOrange = buildSchemeSwap({
 
 // ─── Registry ────────────────────────────────────────────────────
 
-/**
- * All recommendations for colorblindSafetyRule, in display order.
- *
- * Ordering rationale:
- *   - Sequential safe defaults (viridis, cividis) come first because
- *     they are the most defensible recommendations regardless of context.
- *   - Context-specific sequential options (turbo, magma, plasma) come
- *     next; their `applicableWhen` filters keep them out when irrelevant.
- *   - Categorical options come next, ordered from most-neutral
- *     (tableau10) to most-niche (observable10).
- *   - Diverging options come last, ordered from CVD-safest (blueorange)
- *     to most-specific (purpleorange).
- *
- * The UI filters by `applicableWhen` before rendering, so on any given
- * issue only the relevant subset appears — typically 2–4 options.
- */
 export const colorblindSafetyRecommendations: Recommendation[] = [
   // Sequential
-  swapToTurbo,
   swapToViridis,
   swapToCividis,
+  swapToTurbo,
   swapToMagma,
   swapToPlasma,
-  // Categorical
+  // Categorical — Vega-registered schemes first
   swapToTableau10,
   swapToSet2,
   swapToDark2,
   swapToObservable10,
+  // Categorical — hand-picked, guaranteed-safe palettes
+  swapToOkabeIto,
+  swapToWong,
   // Diverging
   swapToBlueOrange,
   swapToRedBlue,
@@ -333,19 +413,8 @@ export const colorblindSafetyRecommendations: Recommendation[] = [
 // ─── Backward-compatibility shim ────────────────────────────────
 
 /**
- * Backward-compatibility shim for the v1 API.
- *
- * Earlier versions of this module exported `describeCvdRecommendation`
- * to dynamically produce per-issue descriptions ("Switches 'rainbow' to
- * 'turbo'…"). The new design bakes the description into each named
- * recommendation directly, so dynamic rewriting is no longer needed.
- *
- * This shim is kept so that:
- *   - `index.ts` can continue re-exporting the same name, and
- *   - any UI code that still calls `describeCvdRecommendation(rec, issue)`
- *     keeps working without modification.
- *
- * It simply returns the recommendation's static description.
+ * Backward-compatibility shim for the v1 API. Returns the
+ * recommendation's static description.
  */
 export function describeCvdRecommendation(
   recommendation: Recommendation,

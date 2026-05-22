@@ -11,7 +11,9 @@
  * actually distinguish the colors in this specific scale?"
  *
  * Architecture:
- *   1. resolveScaleColors  — find scales in the spec, resolve to color arrays
+ *   1. resolveScaleColors  — find scales in the spec, resolve to color arrays,
+ *                            and slice categorical scales to the actual
+ *                            number of categories used by the data
  *   2. evaluateColorblindSafety — simulate CVD, measure distinguishability
  *   3. this file            — orchestrate and produce AccessibilityIssue objects
  *
@@ -45,6 +47,12 @@ const CVD_LABELS: Record<string, string> = {
 /**
  * Build one AccessibilityIssue per CVD type that caused problems
  * on a given resolved scale.
+ *
+ * Evidence carries:
+ *   - everything the renderer needs to draw the CVD preview
+ *   - `scaleType` and `schemeName` so recommendations can filter
+ *   - `usedCategoryCount` (categorical scales only) so recommendations
+ *     applying explicit palettes can slice them to the right length
  */
 function buildIssues(
   scale: ResolvedScale,
@@ -99,6 +107,10 @@ function buildIssues(
         scaleType: scale.scaleType,
         channel: scale.channel,
         schemeName: scale.schemeName ?? null,
+        // Threaded through from resolveScaleColors so range-based
+        // recommendations (Okabe-Ito, Wong) know how many colors to apply.
+        // Undefined for sequential / diverging scales.
+        usedCategoryCount: scale.usedCategoryCount ?? null,
         minDeltaE: result.minDeltaE,
         threshold,
         resolvedColorCount: scale.colors.length,
@@ -129,16 +141,18 @@ export const colorblindSafetyRule: AccessibilityRule = {
     'colors remain perceptually distinguishable using CIEDE2000.',
   references: [BRETTEL_1997, MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018],
   evaluate(spec: Record<string, unknown>): AccessibilityIssue[] {
-    // Step 1: Find all explicit color scales and resolve them to colors
+    // Step 1: Find all explicit color scales and resolve them to colors.
+    // For categorical scales this also slices the color list down to
+    // the actual number of categories used by the data.
     const scales = resolveScaleColors(spec);
 
     // Step 2: For each scale, simulate CVD and check distinguishability
     const issues: AccessibilityIssue[] = [];
 
     for (const scale of scales) {
-      console.log('[CVD debug] scale:', scale.channel, scale.colors);
+      console.log('[CVD debug] scale:', scale.channel, scale.colors, 'used count:', scale.usedCategoryCount);
       debugCvdDeltaE(scale.colors, scale.scaleType);
-      
+
       const cvdResults = evaluateColorblindSafety(scale.colors, scale.scaleType);
 
       // Step 3: Convert problematic results into AccessibilityIssue objects

@@ -9,9 +9,9 @@
  *   colorRiskRule fires on color FAMILIES detected in the spec
  *   (e.g. "this scale contains a red and a green color"), regardless
  *   of how the colors were specified. Its issues do NOT carry a
- *   `scaleType` field — the rule looks across `mark.{color|fill|stroke}`,
- *   `encoding.*.value`, `scale.range`, `scale.scheme`, and
- *   `config.range.*`, so the "scale type" concept doesn't always apply.
+ *   `scaleType` field — the rule looks across many spec locations
+ *   (mark colors, encoding values, scale ranges, config ranges), so
+ *   the "scale type" concept doesn't always apply.
  *
  *   The CVD simulation rule (colorblindSafetyRule), in contrast, only
  *   evaluates `scale.range` and `scale.scheme` and always knows the
@@ -20,25 +20,19 @@
  *   In most cases the two rules fire together and the dedup logic in
  *   `evaluateVegaLiteAccessibility.ts` removes the colorRiskRule issue
  *   when CVD covers the same scale. But colorRiskRule can survive
- *   dedup — e.g. when red+green appear in `mark.fill` and `mark.stroke`,
- *   or in `config.range.category`. Those surviving issues deserve their
- *   own recommendations, hence this file.
+ *   dedup, and those surviving issues deserve their own recommendations.
  *
  * Recommendation strategy:
  *
  *   We infer the scale context from the issue's `jsonPointer` and the
  *   spec, then offer the corresponding scheme-swap recommendations:
  *
- *     - Pointer ends in /scale/range/N        → categorical swaps
- *     - Pointer ends in /scale/scheme         → infer type from scheme name
- *     - Pointer ends in /mark/color           → single-color swap (not yet implemented)
- *     - Pointer in /config/range/*            → categorical swaps
- *
- *   When we can confidently classify the context as categorical, we
- *   reuse the categorical recommendations from colorblindSafetyRecs.
- *   When we can't (e.g. mark.fill on a non-categorical encoding), we
- *   currently emit no recommendations — the user still sees the warning
- *   message and the suggestion text, just no clickable fixes.
+ *     - Pointer in /encoding/<channel>/scale/range/N or /scheme
+ *       → look at the channel's `type` field:
+ *           nominal/ordinal → categorical recommendations
+ *           quantitative/temporal → sequential recommendations
+ *     - Pointer somewhere else (mark.fill, config.range)
+ *       → no recommendations offered in this first cut.
  */
 
 import type {AccessibilityIssue} from '../types.js';
@@ -59,16 +53,13 @@ type RiskContext =
  * points at, so we can offer matching scheme swaps.
  *
  * Strategy:
- *   1. Walk up the issue's JSON pointer looking for `.../scale/range`
- *      or `.../scale/scheme`.
- *   2. If found, look at the parent encoding channel's `type` field
- *      to determine whether the scale is categorical or sequential.
- *   3. Fall back to inferring from the scheme name (e.g. "viridis"
- *      implies sequential).
+ *   1. Walk the issue's pointer looking for `/encoding/<channel>/scale`.
+ *   2. Read that channel's `type` field to determine categorical vs
+ *      sequential vs diverging.
+ *   3. Fall back to scheme name inference if `type` is missing.
  *
  * Returns 'unknown' when the pointer doesn't address a scale we can
  * recommend a swap for (e.g. mark.fill, config.range.category).
- * Those cases get no recommendations in this first cut.
  */
 function inferRiskContext(
   issue: AccessibilityIssue,
@@ -77,33 +68,36 @@ function inferRiskContext(
   const pointer = issue.jsonPointer;
   if (!pointer) return {kind: 'unknown'};
 
-  // Walk up the pointer until we hit /scale/range or /scale/scheme.
   // Pointer examples we want to handle:
-  //   /encoding/color/scale/range/0       (categorical range entry)
-  //   /encoding/color/scale/scheme        (scheme reference)
+  //   /encoding/color/scale/range/0   (categorical range entry)
+  //   /encoding/color/scale/scheme    (scheme reference)
   const segments = pointer.split('/').filter(Boolean);
   const scaleIdx = segments.indexOf('scale');
   if (scaleIdx === -1) return {kind: 'unknown'};
 
   // We need an /encoding/<channel>/scale prefix to look at the
-  // field type. Reject /config/range/... etc. for now.
+  // channel's field type. Reject /config/range/... for now.
   if (segments[0] !== 'encoding' || scaleIdx < 2) return {kind: 'unknown'};
 
   const channel = segments[1];
   const scalePointer = '/' + segments.slice(0, scaleIdx + 1).join('/');
 
-  // Read the encoding channel definition for its `type` field.
   const channelDef = (spec as any)?.encoding?.[channel];
   const fieldType = channelDef?.type;
 
-  // Nominal/ordinal → categorical. Quantitative/temporal → sequential
-  // (we don't try to distinguish diverging here — the CVD rule covers
-  // the cases where diverging matters, and red+green almost always
-  // means a categorical mistake in practice).
-  if (fieldType === 'nominal') {
-    return {kind: 'categorical-range', scalePointer};
+  // Diverging signals on the scale block (mirror resolveScaleColors.ts).
+  const scale = channelDef?.scale;
+  const looksDiverging =
+    scale?.type === 'diverging' ||
+    (Array.isArray(scale?.domain) && scale.domain.length === 3) ||
+    scale?.domainMid != null ||
+    (typeof scale?.scheme === 'string' && findScheme(scale.scheme)?.type === 'diverging');
+
+  if (looksDiverging) {
+    return {kind: 'diverging-range', scalePointer};
   }
-  if (fieldType === 'ordinal') {
+
+  if (fieldType === 'nominal' || fieldType === 'ordinal') {
     // Ordinal is technically ordered, but red+green pairings on
     // ordinal scales still mean categorical-looking fixes apply
     // (tableau10 etc. work fine for ordinal data).
@@ -113,19 +107,11 @@ function inferRiskContext(
     return {kind: 'sequential-range', scalePointer};
   }
 
-  // Last resort: infer from scheme name if we can find one.
-  const schemeName: unknown = channelDef?.scale?.scheme;
-  if (typeof schemeName === 'string') {
-    const scheme = findScheme(schemeName);
-    if (scheme?.type === 'sequential') {
-      return {kind: 'sequential-range', scalePointer};
-    }
-    if (scheme?.type === 'diverging') {
-      return {kind: 'diverging-range', scalePointer};
-    }
-    if (scheme?.type === 'categorical') {
-      return {kind: 'categorical-range', scalePointer};
-    }
+  // Last resort: infer from scheme name.
+  if (typeof scale?.scheme === 'string') {
+    const scheme = findScheme(scale.scheme);
+    if (scheme?.type === 'sequential') return {kind: 'sequential-range', scalePointer};
+    if (scheme?.type === 'categorical') return {kind: 'categorical-range', scalePointer};
   }
 
   return {kind: 'unknown'};
@@ -133,12 +119,6 @@ function inferRiskContext(
 
 // ─── Helper factory ─────────────────────────────────────────────
 
-/**
- * Build a "swap to a specific scheme" recommendation for the risk
- * rule. Same shape as the CVD version but applicability is gated by
- * the inferred risk context (since the issue evidence doesn't carry
- * a scale type directly).
- */
 function buildRiskSwap(args: {
   id: string;
   label: string;
@@ -158,10 +138,10 @@ function buildRiskSwap(args: {
     },
 
     apply(issue, spec) {
-      // We use the inferred scale pointer rather than parentPointer
-      // because the issue's pointer often addresses one element of a
-      // range array (e.g. /scale/range/0) — its parent is the range
-      // array itself, not the scale object setScheme needs.
+      // Use the inferred scale pointer rather than parentPointer
+      // because the issue pointer often addresses one element of a
+      // range array — its parent is the range array, not the scale
+      // object setScheme needs.
       const ctx = inferRiskContext(issue, spec);
       const scalePointer =
         ctx.kind === 'unknown' ? parentPointer(issue.jsonPointer) : ctx.scalePointer;
@@ -171,11 +151,6 @@ function buildRiskSwap(args: {
 }
 
 // ─── Categorical recommendations ────────────────────────────────
-
-// These mirror the categorical recs in colorblindSafetyRecs.ts.
-// We don't import and reuse those directly because their
-// `applicableWhen` reads `evidence.scaleType` which the risk rule
-// doesn't emit — so we need a parallel set keyed on context inference.
 
 export const riskSwapToTableau10 = buildRiskSwap({
   id: 'risk-swap-to-tableau10',
@@ -198,16 +173,6 @@ export const riskSwapToSet2 = buildRiskSwap({
   appliesToContext: (ctx) => ctx.kind === 'categorical-range',
 });
 
-export const riskSwapToDark2 = buildRiskSwap({
-  id: 'risk-swap-to-dark2',
-  label: 'Switch to dark2',
-  description:
-    'Higher-saturation ColorBrewer categorical palette. Best when the ' +
-    'original design was vibrant and you want to keep strong color ' +
-    'separation between categories.',
-  schemeName: 'dark2',
-  appliesToContext: (ctx) => ctx.kind === 'categorical-range',
-});
 
 export const riskSwapToObservable10 = buildRiskSwap({
   id: 'risk-swap-to-observable10',
@@ -256,17 +221,26 @@ export const riskSwapToBlueOrange = buildRiskSwap({
   appliesToContext: (ctx) => ctx.kind === 'diverging-range',
 });
 
+export const riskSwapToRedBlue = buildRiskSwap({
+  id: 'risk-swap-to-redblue',
+  label: 'Switch to redblue',
+  description:
+    'Classic diverging palette (red-white-blue). Reasonably CVD-safe.',
+  schemeName: 'redblue',
+  appliesToContext: (ctx) => ctx.kind === 'diverging-range',
+});
+
 // ─── Registry ────────────────────────────────────────────────────
 
 export const colorRiskRecommendations: Recommendation[] = [
   // Categorical (most common case for red-green pairings)
   riskSwapToTableau10,
   riskSwapToSet2,
-  riskSwapToDark2,
   riskSwapToObservable10,
   // Sequential
   riskSwapToViridis,
   riskSwapToCividis,
   // Diverging
   riskSwapToBlueOrange,
+  riskSwapToRedBlue,
 ];
