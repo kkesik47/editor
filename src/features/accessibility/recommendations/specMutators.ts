@@ -98,6 +98,115 @@ export function setScaleType(
   }));
 }
 
+/**
+ * Set (or replace) an encoding channel at the given encoding pointer.
+ *
+ * Used by recommendations that add a redundant non-color channel
+ * (shape, strokeDash, column) for the same field, to satisfy
+ * WCAG 1.4.1 (color must not be the sole means of conveying info).
+ *
+ * If the channel already exists it is overwritten. In practice the
+ * triggering rule only fires when no other channel encodes the same
+ * field, so an overwrite would only ever replace a channel encoding a
+ * *different* field — a rare case the author can see and undo.
+ *
+ * e.g. setEncodingChannel(spec, '/encoding', 'shape',
+ *        {field: 'category', type: 'nominal'})
+ */
+export function setEncodingChannel(
+  spec: VegaLiteSpec,
+  encodingPointer: string,
+  channel: string,
+  channelDef: Record<string, unknown>,
+): VegaLiteSpec {
+  return updateAt(spec, encodingPointer, (encoding) => {
+    const current = (encoding as Record<string, unknown>) ?? {};
+    return {...current, [channel]: channelDef};
+  });
+}
+
+/**
+ * Convert the mark at the given pointer to a `point` mark, so a
+ * `shape` encoding channel actually renders varying shapes.
+ *
+ * `circle` and `square` lock their shape (they are `point` with a
+ * fixed shape), so a shape channel on them is silently ignored.
+ * Converting to `point` unlocks it. We set `filled: true` to keep the
+ * filled look of circle/square (plain `point` is hollow), and we
+ * preserve any other existing mark properties.
+ *
+ *   "mark": "circle"                    → {"type": "point", "filled": true}
+ *   "mark": {"type": "square", size: 80} → {"type": "point", "size": 80, "filled": true}
+ *   "mark": "point"                     → "point"  (unchanged)
+ */
+export function convertMarkToPoint(
+  spec: VegaLiteSpec,
+  markPointer: string,
+): VegaLiteSpec {
+  return updateAt(spec, markPointer, (mark) => {
+    // String form: 'circle' / 'square' / 'point'.
+    if (typeof mark === 'string') {
+      if (mark === 'point') return 'point';
+      return {type: 'point', filled: true}; // circle/square are filled by default
+    }
+
+    // Object form: keep existing properties, switch type to point.
+    if (mark && typeof mark === 'object') {
+      const m = mark as Record<string, unknown>;
+      const next: Record<string, unknown> = {...m, type: 'point'};
+      // Preserve circle/square's filled-by-default look unless the
+      // author already set `filled` explicitly.
+      if (next.filled === undefined && (m.type === 'circle' || m.type === 'square')) {
+        next.filled = true;
+      }
+      return next;
+    }
+
+    return {type: 'point', filled: true};
+  });
+}
+
+/**
+ * Set a primitive value at the given pointer. The pointer must
+ * address an existing settable location (the value's parent must
+ * exist). Used by recommendations that replace a single value in
+ * place — e.g. bumping an inline or config fontSize number.
+ *
+ *   setValueAt(spec, '/encoding/x/axis/labelFontSize', 13)
+ */
+export function setValueAt(
+  spec: VegaLiteSpec,
+  pointer: string,
+  value: unknown,
+): VegaLiteSpec {
+  return updateAt(spec, pointer, () => value);
+}
+
+/**
+ * Set config.<section>.<property> to a value, creating the `config`
+ * and section objects if they don't exist yet. Used when the fix
+ * belongs at the config level rather than on a specific node — e.g.
+ * a too-small Vega-Lite *default* font size, where nothing is set
+ * inline and writing to config is the cleanest, most robust place.
+ *
+ *   setConfigProperty(spec, 'axis', 'labelFontSize', 13)
+ *     → { ..., config: { axis: { labelFontSize: 13 } } }
+ *
+ * Existing config / section properties are preserved.
+ */
+export function setConfigProperty(
+  spec: VegaLiteSpec,
+  section: string,
+  property: string,
+  value: unknown,
+): VegaLiteSpec {
+  return updateAt(spec, '/config', (config) => {
+    const cfg = (config as Record<string, unknown>) ?? {};
+    const sectionObj = (cfg[section] as Record<string, unknown>) ?? {};
+    return {...cfg, [section]: {...sectionObj, [property]: value}};
+  });
+}
+
 // ─── Pointer helpers ────────────────────────────────────────────
 
 /**

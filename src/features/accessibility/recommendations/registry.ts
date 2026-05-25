@@ -28,6 +28,8 @@ import type {AccessibilityIssue} from '../types.js';
 import type {Recommendation, VegaLiteSpec} from './types.js';
 import {colorblindSafetyRecommendations} from './colorblindSafetyRecs.js';
 import {colorRiskRecommendations} from './colorRiskRecs.js';
+import {colorOnlyEncodingRecommendations} from './colorOnlyEncodingRecs.js';
+import {fontSizeRecommendations} from './fontSizeRecs.js';
 
 const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   'vl-a11y-colorblind-safety': colorblindSafetyRecommendations,
@@ -35,6 +37,8 @@ const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   // recommendations array — see the special-case note above.
   'vl-a11y-color-risk-engine': colorRiskRecommendations,
   'vl-a11y-color-risk-rules': colorRiskRecommendations,
+  'vl-a11y-color-only': colorOnlyEncodingRecommendations,
+  'vl-a11y-font-size': fontSizeRecommendations,
 };
 
 /**
