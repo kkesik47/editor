@@ -1,0 +1,58 @@
+/* ── AccessibilityHeatmap overlay ──────────────────────────────── */
+
+/*
+ * The overlay sits absolutely inside .chart (which is position:
+ * relative) and is sized/positioned in JS to match the rendered
+ * graphic. pointer-events: none lets all mouse interaction fall
+ * through to the chart untouched. (Chunk 4 will re-enable pointer
+ * events on individual regions for hover/click.)
+ *
+ * z-index 13 keeps it above the chart graphic but below the existing
+ * recording overlay (.chart-overlay, z-index 14).
+ */
+.a11y-heatmap {
+  position: absolute;
+  pointer-events: none;
+  z-index: 13;
+}
+
+.a11y-heatmap-svg {
+  display: block;
+  overflow: visible;
+}
+
+/*
+ * Issue regions. Semi-transparent fill so the chart shows through,
+ * with a stronger outline so the region reads clearly. Severity drives
+ * the hue: warnings (something the author should fix) are orange;
+ * info/suggestions (e.g. AAA nudges, default-derived issues) are blue.
+ *
+ * pointer-events: auto re-enables hover ON THE REGIONS ONLY — the
+ * parent SVG stays pointer-events: none, so empty areas still pass
+ * mouse events through to the chart. cursor: pointer signals the
+ * region is interactive (hovering spotlights the source line).
+ *
+ * vector-effect keeps the outline crisp even though the viewBox is
+ * scaled non-uniformly to match the displayed chart.
+ */
+.a11y-region {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: fill-opacity 0.1s ease;
+}
+
+.a11y-region:hover {
+  fill-opacity: 0.4;
+}
+
+.a11y-region-warning {
+  fill: rgba(240, 150, 20, 0.22);
+  stroke: rgba(200, 110, 0, 0.9);
+}
+
+.a11y-region-info {
+  fill: rgba(30, 130, 230, 0.18);
+  stroke: rgba(20, 100, 210, 0.9);
+}

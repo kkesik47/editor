@@ -12,6 +12,7 @@ import './index.css';
 import {expressionInterpreter as vegaInterpreter} from 'vega-interpreter';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useNavigate, useLocation} from 'react-router-dom';
+import AccessibilityHeatmap from '../accessibility-heatmap/renderer.js';
 
 // Add additional projections
 addProjections(vega.projection);
@@ -376,6 +377,7 @@ export default function Renderer(props: RendererProps) {
           <div className="chart-overlay" />
         </Popup>
         <div aria-label="visualization" ref={chartRef} style={chartStyle} />
+        <AccessibilityHeatmap />
         {(responsiveWidth || responsiveHeight) && (
           <div className="chart-resize-handle" onMouseDown={handleResizeMouseDown}>
             <svg width="10" height="10">

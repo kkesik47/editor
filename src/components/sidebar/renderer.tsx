@@ -33,6 +33,7 @@ interface SidebarProps {
   tooltipEnable: boolean;
   backgroundColor: string;
   expressionInterpreter: boolean;
+  heatmapEnable: boolean;
   setHover: (hover: boolean | 'auto') => void;
   setLogLevel: (level: number) => void;
   setRenderer: (renderer: string) => void;
@@ -40,6 +41,7 @@ interface SidebarProps {
   setTooltip: (enabled: boolean) => void;
   setBackgroundColor: (color: string) => void;
   setExpressionInterpreter: (enabled: boolean) => void;
+  setHeatmap: (enabled: boolean) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
@@ -110,6 +112,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     tooltipEnable,
     expressionInterpreter,
     setExpressionInterpreter,
+    setHeatmap,
+    heatmapEnable,
   } = props;
 
   const hover = typeof props.hoverEnable !== 'boolean' ? 'Auto' : props.hoverEnable ? 'On' : 'Off';
@@ -216,6 +220,23 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           Vega Tooltip
         </a>{' '}
         handler.
+      </p>
+      <div className="tooltips">
+        <label>
+          <input
+            onChange={(e) => setHeatmap(e.target.checked)}
+            type="checkbox"
+            name=""
+            id="heatmap"
+            checked={heatmapEnable}
+          />
+          Accessibility heatmap
+        </label>
+      </div>
+      <p className="settings-description">
+        Overlay coloured regions on the chart showing where each
+        accessibility issue appears. Hovering a region highlights the
+        matching line in the editor.
       </p>
       <div className="expression-interpreter">
         <label>

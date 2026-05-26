@@ -132,20 +132,12 @@ function toIssueDecorations(
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
-    const header = isAAA
-      ? `**Accessibility suggestion** (WCAG AAA)`
-      : `**Accessibility** (${issue.severity})`;
+    const header = isAAA ? `**Accessibility suggestion** (WCAG AAA)` : `**Accessibility** (${issue.severity})`;
 
     // Brief tooltip: header + message-with-italic-citations + footer.
     // Full details (suggestion, previews, clickable references) live
     // in the Accessibility tab.
-    const hoverParts = [
-      header,
-      '',
-      appendCitationsMarkdown(issue),
-      '',
-      'See the Accessibility tab for details.',
-    ];
+    const hoverParts = [header, '', appendCitationsMarkdown(issue), '', 'See the Accessibility tab for details.'];
 
     // Pick decoration class based on WCAG level
     const inlineClass = isAAA ? 'a11ySuggestionInlineDecoration' : 'a11yInlineDecoration';
@@ -252,13 +244,26 @@ const EditorWithNavigation: React.FC<{
   updateVegaSpec: (spec: string, config?: string) => void;
 }> = (props) => {
   const {state} = useAppContext();
-  const {mode, editorString, decorations, manualParse, parse, sidePaneItem, configEditorString, accessibilityIssues} =
-    state;
+  const {
+    mode,
+    editorString,
+    decorations,
+    manualParse,
+    parse,
+    sidePaneItem,
+    configEditorString,
+    accessibilityIssues,
+    hoveredIssueKey,
+  } = state;
 
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<MonacoModule | null>(null);
   const [currentDecorationIds, setCurrentDecorationIds] = useState<string[]>([]);
-
+  // Independent decorations collection for the heatmap hover highlight.
+  // Using a collection (rather than a second deltaDecorations id list)
+  // keeps this fully isolated from the issue-underline decorations, so
+  // the two never clear each other's ids. Created lazily on first use.
+  const hoverCollectionRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const {compressed} = useParams<{compressed?: string}>();
@@ -487,6 +492,70 @@ const EditorWithNavigation: React.FC<{
     const markers = toIssueMarkers(accessibilityIssues || [], editorRef.current, monacoRef.current);
     monacoRef.current.editor.setModelMarkers(model, 'vega-editor-a11y', markers);
   }, [accessibilityIssues, editorString]);
+
+  // Highlight the source line for whichever issue is hovered on the
+  // chart heatmap. `hoveredIssueKey` is set by the heatmap overlay and
+  // cleared (null) on mouse-leave. We reuse the same jsonPointer →
+  // Monaco-position mapping as the issue decorations.
+  useEffect(() => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model) {
+      return;
+    }
+
+    // Lazily create the collection on first run, then reuse it.
+    if (!hoverCollectionRef.current) {
+      hoverCollectionRef.current = editor.createDecorationsCollection();
+    }
+    const collection = hoverCollectionRef.current;
+
+    // No issue hovered → clear the highlight (leaves issue underlines
+    // untouched, since they live in a different decoration owner).
+    if (!hoveredIssueKey) {
+      collection.clear();
+      return;
+    }
+
+    // The heatmap builds its key as `${ruleId}|${jsonPointer}|${index}`,
+    // matching the accessibility pane. Recompute per issue and compare.
+    const issues = accessibilityIssues ?? [];
+    const hovered = issues.find((issue, index) => `${issue.ruleId}|${issue.jsonPointer}|${index}` === hoveredIssueKey);
+    if (!hovered || hovered.jsonPointer == null) {
+      collection.clear();
+      return;
+    }
+
+    const tree = parseTree(model.getValue());
+    const node = tree ? findNodeAtLocation(tree, jsonPointerToPath(hovered.jsonPointer)) : undefined;
+    if (!node) {
+      collection.clear();
+      return;
+    }
+
+    const start = model.getPositionAt(node.offset);
+    const end = model.getPositionAt(node.offset + node.length);
+
+    // Replace whatever the collection held with the single new highlight.
+    collection.set([
+      {
+        range: {
+          startLineNumber: start.lineNumber,
+          startColumn: start.column,
+          endLineNumber: end.lineNumber,
+          endColumn: end.column,
+        },
+        options: {
+          // Highlight the whole line(s) plus the exact span, so the
+          // author's eye is drawn to the right place even for a value
+          // deep in a line.
+          isWholeLine: true,
+          className: 'a11yHoverLineHighlight',
+          inlineClassName: 'a11yHoverInlineHighlight',
+        },
+      },
+    ]);
+  }, [hoveredIssueKey, accessibilityIssues]);
 
   return (
     <ResizeObserver

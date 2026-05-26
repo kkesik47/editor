@@ -12,6 +12,7 @@ export default function Sidebar() {
     tooltipEnable: state.tooltipEnable,
     backgroundColor: state.backgroundColor,
     expressionInterpreter: state.expressionInterpreter,
+    heatmapEnable: state.heatmapEnable,
   };
 
   return (
@@ -24,6 +25,7 @@ export default function Sidebar() {
       setTooltip={(enabled) => setState((s) => ({...s, tooltipEnable: enabled}))}
       setBackgroundColor={(color) => setState((s) => ({...s, backgroundColor: color}))}
       setExpressionInterpreter={(enabled) => setState((s) => ({...s, expressionInterpreter: enabled}))}
+      setHeatmap={(enabled) => setState((s) => ({...s, heatmapEnable: enabled}))}
     />
   );
 }

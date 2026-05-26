@@ -69,6 +69,7 @@ export type State = {
   expressionInterpreter: boolean;
   runtime: any;
   accessibilityIssues: AccessibilityIssue[];
+  heatmapEnable: boolean;
 };
 
 export const DEFAULT_STATE: State = {
@@ -123,4 +124,5 @@ export const DEFAULT_STATE: State = {
   expressionInterpreter: false,
   runtime: null,
   accessibilityIssues: [],
+  heatmapEnable: true,
 };

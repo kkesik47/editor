@@ -1,0 +1,113 @@
+/**
+ * boundingBox.ts
+ *
+ * Pure geometry helpers for the accessibility heatmap overlay.
+ *
+ * The overlay's job is: given an accessibility issue, paint a region
+ * over the part of the rendered chart it concerns. To do that we walk
+ * Vega's runtime scenegraph (a tree of "scene items", each with pixel
+ * `bounds` and a semantic `role`), pick the items an issue refers to,
+ * and merge their boxes into one rectangle to draw.
+ *
+ * THE COORDINATE GOTCHA (learned the hard way):
+ *
+ *   A scene item's `bounds` are NOT absolute. They are relative to the
+ *   coordinate origin of the group that contains it. Groups carry an
+ *   (x, y) translate — e.g. the x-axis group is pushed down by the plot
+ *   height, the title group is pushed up. So an x-axis label may report
+ *   bounds at y=7 while actually sitting at y=307 because its group is
+ *   translated down by 300.
+ *
+ *   To get the true (absolute) position of any item, you add up the
+ *   (x, y) of every ANCESTOR group on the way down to it. An item's own
+ *   (x, y) is already baked into its own bounds, so it is only ever
+ *   added to its CHILDREN, never to itself. collectAbsoluteBoxes does
+ *   exactly this accumulation; resolvers should always go through it
+ *   rather than reading `bounds` directly.
+ */
+
+/** An axis-aligned rectangle in the rendered chart's pixel space. */
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * A Vega scene item. We only type the handful of fields the overlay
+ * reads; the real runtime object carries far more.
+ *
+ * - `bounds` is relative to the containing group's origin (see above).
+ * - `x`/`y` is this item's own translate; it shifts this item's
+ *   CHILDREN, and is already reflected in this item's own `bounds`.
+ * - group items have `items` (child marks); leaf items do not.
+ */
+export interface SceneItem {
+  marktype?: string;
+  role?: string;
+  x?: number;
+  y?: number;
+  bounds?: {x1: number; y1: number; x2: number; y2: number};
+  items?: SceneItem[];
+  datum?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Convert one scene item's (already-absolute) bounds into a BoundingBox. */
+export function boundsFromSceneItem(item: SceneItem): BoundingBox | null {
+  const b = item.bounds;
+  if (!b) return null;
+  return {x: b.x1, y: b.y1, width: b.x2 - b.x1, height: b.y2 - b.y1};
+}
+
+/**
+ * Merge several boxes into the smallest box that contains them all.
+ * Returns null for an empty list, so callers can simply skip drawing.
+ */
+export function unionBounds(boxes: BoundingBox[]): BoundingBox | null {
+  if (boxes.length === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const box of boxes) {
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.width);
+    maxY = Math.max(maxY, box.y + box.height);
+  }
+
+  return {x: minX, y: minY, width: maxX - minX, height: maxY - minY};
+}
+
+/**
+ * Walk the scenegraph and return the ABSOLUTE bounding box of every
+ * item the predicate accepts, accumulating ancestor group translates
+ * so the boxes land where Vega actually drew them.
+ *
+ * This is the primitive every resolver builds on: accept items by
+ * `role` (e.g. 'axis-label') or `marktype`, get their true boxes back,
+ * then unionBounds them into one region.
+ */
+export function collectAbsoluteBoxes(root: SceneItem, accept: (item: SceneItem) => boolean): BoundingBox[] {
+  const out: BoundingBox[] = [];
+
+  const visit = (item: SceneItem, offsetX: number, offsetY: number) => {
+    if (item.bounds && accept(item)) {
+      const b = item.bounds;
+      out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
+    }
+    // Children are positioned relative to THIS item's translate, so fold
+    // it into the offset before recursing. A leaf has no children, so its
+    // own x/y is never double-counted (it is already inside its bounds).
+    const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+    const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+    item.items?.forEach((child) => visit(child, childX, childY));
+  };
+
+  visit(root, 0, 0);
+  return out;
+}
