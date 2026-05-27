@@ -253,7 +253,7 @@ const EditorWithNavigation: React.FC<{
     sidePaneItem,
     configEditorString,
     accessibilityIssues,
-    hoveredIssueKey,
+    hoveredIssueKeys,
   } = state;
 
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -493,10 +493,11 @@ const EditorWithNavigation: React.FC<{
     monacoRef.current.editor.setModelMarkers(model, 'vega-editor-a11y', markers);
   }, [accessibilityIssues, editorString]);
 
-  // Highlight the source line for whichever issue is hovered on the
-  // chart heatmap. `hoveredIssueKey` is set by the heatmap overlay and
-  // cleared (null) on mouse-leave. We reuse the same jsonPointer →
-  // Monaco-position mapping as the issue decorations.
+  // Highlight the source line(s) for whichever issues are hovered on
+  // the chart heatmap. `hoveredIssueKeys` is set by the heatmap overlay
+  // (a cluster can represent several issues) and cleared to [] on
+  // mouse-leave. We reuse the same jsonPointer → Monaco-position mapping
+  // as the issue decorations, once per issue in the cluster.
   useEffect(() => {
     const editor = editorRef.current;
     const model = editor?.getModel();
@@ -510,52 +511,54 @@ const EditorWithNavigation: React.FC<{
     }
     const collection = hoverCollectionRef.current;
 
-    // No issue hovered → clear the highlight (leaves issue underlines
+    const hoveredKeys = hoveredIssueKeys ?? [];
+
+    // Nothing hovered → clear the highlight (leaves issue underlines
     // untouched, since they live in a different decoration owner).
-    if (!hoveredIssueKey) {
+    if (hoveredKeys.length === 0) {
       collection.clear();
       return;
     }
 
-    // The heatmap builds its key as `${ruleId}|${jsonPointer}|${index}`,
-    // matching the accessibility pane. Recompute per issue and compare.
+    // The heatmap builds each key as `${ruleId}|${jsonPointer}|${index}`,
+    // matching the accessibility pane. Recompute per issue, keep those in
+    // the hovered set, and map each to a line range.
     const issues = accessibilityIssues ?? [];
-    const hovered = issues.find((issue, index) => `${issue.ruleId}|${issue.jsonPointer}|${index}` === hoveredIssueKey);
-    if (!hovered || hovered.jsonPointer == null) {
-      collection.clear();
-      return;
-    }
-
     const tree = parseTree(model.getValue());
-    const node = tree ? findNodeAtLocation(tree, jsonPointerToPath(hovered.jsonPointer)) : undefined;
-    if (!node) {
+
+    const decorations = issues
+      .map((issue, index) => ({issue, key: `${issue.ruleId}|${issue.jsonPointer}|${index}`}))
+      .filter(({issue, key}) => hoveredKeys.includes(key) && issue.jsonPointer != null)
+      .map(({issue}) => {
+        const node = tree ? findNodeAtLocation(tree, jsonPointerToPath(issue.jsonPointer)) : undefined;
+        if (!node) return null;
+        const start = model.getPositionAt(node.offset);
+        const end = model.getPositionAt(node.offset + node.length);
+        return {
+          range: {
+            startLineNumber: start.lineNumber,
+            startColumn: start.column,
+            endLineNumber: end.lineNumber,
+            endColumn: end.column,
+          },
+          options: {
+            // Highlight the whole line(s) plus the exact span, so the
+            // author's eye is drawn to the right place even for a value
+            // deep in a line.
+            isWholeLine: true,
+            className: 'a11yHoverLineHighlight',
+            inlineClassName: 'a11yHoverInlineHighlight',
+          },
+        };
+      })
+      .filter((d): d is NonNullable<typeof d> => d !== null);
+
+    if (decorations.length === 0) {
       collection.clear();
-      return;
+    } else {
+      collection.set(decorations);
     }
-
-    const start = model.getPositionAt(node.offset);
-    const end = model.getPositionAt(node.offset + node.length);
-
-    // Replace whatever the collection held with the single new highlight.
-    collection.set([
-      {
-        range: {
-          startLineNumber: start.lineNumber,
-          startColumn: start.column,
-          endLineNumber: end.lineNumber,
-          endColumn: end.column,
-        },
-        options: {
-          // Highlight the whole line(s) plus the exact span, so the
-          // author's eye is drawn to the right place even for a value
-          // deep in a line.
-          isWholeLine: true,
-          className: 'a11yHoverLineHighlight',
-          inlineClassName: 'a11yHoverInlineHighlight',
-        },
-      },
-    ]);
-  }, [hoveredIssueKey, accessibilityIssues]);
+  }, [hoveredIssueKeys, accessibilityIssues]);
 
   return (
     <ResizeObserver

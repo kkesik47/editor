@@ -1,11 +1,10 @@
 /* ── AccessibilityHeatmap overlay ──────────────────────────────── */
 
 /*
- * The overlay sits absolutely inside .chart (which is position:
- * relative) and is sized/positioned in JS to match the rendered
- * graphic. pointer-events: none lets all mouse interaction fall
- * through to the chart untouched. (Chunk 4 will re-enable pointer
- * events on individual regions for hover/click.)
+ * The overlay sits absolutely inside .chart (position: relative) and is
+ * sized/positioned in JS to match the rendered graphic. pointer-events:
+ * none lets mouse interaction fall through to the chart; the blobs
+ * re-enable it on themselves so they can be hovered.
  *
  * z-index 13 keeps it above the chart graphic but below the existing
  * recording overlay (.chart-overlay, z-index 14).
@@ -22,37 +21,49 @@
 }
 
 /*
- * Issue regions. Semi-transparent fill so the chart shows through,
- * with a stronger outline so the region reads clearly. Severity drives
- * the hue: warnings (something the author should fix) are orange;
- * info/suggestions (e.g. AAA nudges, default-derived issues) are blue.
- *
- * pointer-events: auto re-enables hover ON THE REGIONS ONLY — the
- * parent SVG stays pointer-events: none, so empty areas still pass
- * mouse events through to the chart. cursor: pointer signals the
- * region is interactive (hovering spotlights the source line).
- *
- * vector-effect keeps the outline crisp even though the viewBox is
- * scaled non-uniformly to match the displayed chart.
+ * Heatmap blobs. The radial-gradient fill (set inline per severity)
+ * gives the soft, borderless "blob" look; there is deliberately no
+ * stroke. Hovering a blob brightens it slightly and is the cue that it
+ * is interactive (it spotlights the matching source line(s)).
  */
-.a11y-region {
-  vector-effect: non-scaling-stroke;
-  stroke-width: 1.5;
+.a11y-blob {
   pointer-events: auto;
   cursor: pointer;
-  transition: fill-opacity 0.1s ease;
+  transition: opacity 0.12s ease;
 }
 
-.a11y-region:hover {
-  fill-opacity: 0.4;
+.a11y-blob:hover {
+  /* Lift toward full strength on hover regardless of count. */
+  opacity: 0.9 !important;
 }
 
-.a11y-region-warning {
-  fill: rgba(240, 150, 20, 0.22);
-  stroke: rgba(200, 110, 0, 0.9);
+/*
+ * Count badges. Rendered as HTML (not SVG) so the circle and number
+ * stay crisp over the non-uniformly scaled overlay. Positioned in pixel
+ * space at the cluster's top-right corner and nudged so the circle
+ * straddles it. Non-interactive: the blob beneath owns the hover.
+ */
+.a11y-badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  color: var(--white-color, #fff);
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.a11y-region-info {
-  fill: rgba(30, 130, 230, 0.18);
-  stroke: rgba(20, 100, 210, 0.9);
+.a11y-badge-warning {
+  background-color: rgb(200, 110, 0);
+}
+
+.a11y-badge-info {
+  background-color: rgb(20, 100, 210);
 }
