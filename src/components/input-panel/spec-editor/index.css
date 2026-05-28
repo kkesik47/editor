@@ -17,17 +17,18 @@
 
 /* ── Accessibility decorations: warnings (Level A / AA) ────────── */
 
+/* Warning — primary, sits closer to the text */
 .a11yInlineDecoration {
   text-decoration: underline wavy #d28a00;
   text-decoration-thickness: 1.5px;
-  text-underline-offset: 1px;
+  text-underline-offset: 2px;
 }
 
 .a11yRangeDecoration {
   background-color: rgba(210, 138, 0, 0.12);
 }
 
-/* ── Accessibility decorations: suggestions (Level AAA) ──────────
+/* ── Accessibility decorations: suggestions (Level AAA) and fontRule ──────────
  *
  * Uses border-bottom instead of text-decoration so it can coexist
  * with the yellow wavy underline from A/AA rules. When both rules
@@ -38,7 +39,7 @@
 
 .a11ySuggestionInlineDecoration {
   text-decoration: underline wavy #1c8ae4;
-  text-decoration-thickness: 1.5px;
+  text-decoration-thickness: 1.5;
   text-underline-offset: 3px;
   /*border-bottom: 2px dashed #6b8aad;*/
   /*padding-bottom: 4px;*/
@@ -52,11 +53,20 @@
    matching source line(s) get a soft wash plus a stronger inline mark
    on the exact value. Distinct from the issue underline decorations so
    the two never visually fight. */
+/* Warning hover (existing, just rename for clarity) */
 .a11yHoverLineHighlight {
   background-color: rgba(255, 193, 7, 0.18);
 }
-
 .a11yHoverInlineHighlight {
   background-color: rgba(255, 193, 7, 0.35);
+  border-radius: 2px;
+}
+
+/* Suggestion hover — matches the blue blob/underline colour */
+.a11yHoverLineHighlightInfo {
+  background-color: rgba(28, 138, 228, 0.12);
+}
+.a11yHoverInlineHighlightInfo {
+  background-color: rgba(28, 138, 228, 0.25);
   border-radius: 2px;
 }

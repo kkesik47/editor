@@ -29,6 +29,7 @@ import type {BoundingBox} from './boundingBox.js';
 import {collectAbsoluteBoxes} from './boundingBox.js';
 import type {IssueResolver, ResolverContext} from './resolvers.js';
 import {channelFromLabel, channelFromPointer, locateTextElement, type TextElementKind} from './textElements.js';
+import {unionBounds} from './boundingBox.js';
 
 /**
  * Highlight the coloured data marks and the legend(s) that show the
@@ -37,11 +38,16 @@ import {channelFromLabel, channelFromPointer, locateTextElement, type TextElemen
 export const colorScaleResolver: IssueResolver = (_issue: AccessibilityIssue, ctx: ResolverContext): BoundingBox[] => {
   const root = ctx.scenegraphRoot;
 
-  // The data marks coloured by the scale (one union box per mark group).
+  // The data marks coloured by the scale.
   const marks = collectAbsoluteBoxes(root, (item) => item.role === 'mark');
 
-  // The legend(s) documenting the scale's colours.
-  const legends = collectAbsoluteBoxes(root, (item) => item.role === 'legend');
+  // Use legend-entry (the coloured symbols + labels) instead of the
+  // whole legend group, so the legend title area stays separate.
+  // This prevents font-size issues on the legend title from being
+  // absorbed into this cluster.
+  const legendEntries = collectAbsoluteBoxes(root, (item) => item.role === 'legend-entry');
+  const legendBox = unionBounds(legendEntries);
+  const legends = legendBox ? [legendBox] : [];
 
   return [...marks, ...legends];
 };

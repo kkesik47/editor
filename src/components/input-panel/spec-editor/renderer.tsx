@@ -39,7 +39,7 @@ function jsonPointerToPath(pointer: string): (string | number)[] {
  * underline to visually separate "must fix" from "nice to have".
  */
 function isAAASuggestion(issue: AccessibilityIssue): boolean {
-  return issue.evidence?.wcagLevel === 'AAA';
+  return issue.severity === 'info';
 }
 
 // ─── Issue → decoration / marker conversion ─────────────────────
@@ -534,6 +534,12 @@ const EditorWithNavigation: React.FC<{
         if (!node) return null;
         const start = model.getPositionAt(node.offset);
         const end = model.getPositionAt(node.offset + node.length);
+
+        // Use blue highlight for suggestions, yellow for warnings
+        const isSuggestion = issue.severity === 'info';
+        const lineClass = isSuggestion ? 'a11yHoverLineHighlightInfo' : 'a11yHoverLineHighlight';
+        const inlineClass = isSuggestion ? 'a11yHoverInlineHighlightInfo' : 'a11yHoverInlineHighlight';
+
         return {
           range: {
             startLineNumber: start.lineNumber,
@@ -542,12 +548,9 @@ const EditorWithNavigation: React.FC<{
             endColumn: end.column,
           },
           options: {
-            // Highlight the whole line(s) plus the exact span, so the
-            // author's eye is drawn to the right place even for a value
-            // deep in a line.
             isWholeLine: true,
-            className: 'a11yHoverLineHighlight',
-            inlineClassName: 'a11yHoverInlineHighlight',
+            className: lineClass,
+            inlineClassName: inlineClass,
           },
         };
       })

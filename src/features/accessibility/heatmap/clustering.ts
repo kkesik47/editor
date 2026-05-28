@@ -72,7 +72,11 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
   const groups: IssueRegion[][] = [];
 
   for (const region of regions) {
-    const group = groups.find((members) => members.some((m) => overlaps(m.box, region.box)));
+    const group = groups.find(
+      (members) =>
+        members[0].issue.severity === region.issue.severity &&
+        members.some((m) => overlaps(m.box, region.box)),
+      );
     if (group) {
       group.push(region);
     } else {
@@ -86,13 +90,12 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
     // Dedupe by key: one issue can contribute several regions to the
     // same cluster (rare), and we want it counted once.
     const byKey = new Map<string, AccessibilityIssue>();
-    let severity: Severity = 'info';
     for (const m of members) {
       byKey.set(m.key, m.issue);
-      severity = worse(severity, (m.issue.severity as Severity) ?? 'info');
     }
 
     const keys = [...byKey.keys()];
+    const severity = (members[0].issue.severity === 'warning' ? 'warning' : 'info') as Severity;
     return {box, issues: [...byKey.values()], keys, severity, count: keys.length};
   });
 }
