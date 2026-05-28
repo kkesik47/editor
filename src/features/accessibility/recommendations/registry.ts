@@ -30,6 +30,7 @@ import {colorblindSafetyRecommendations} from './colorblindSafetyRecs.js';
 import {colorRiskRecommendations} from './colorRiskRecs.js';
 import {colorOnlyEncodingRecommendations} from './colorOnlyEncodingRecs.js';
 import {fontSizeRecommendations} from './fontSizeRecs.js';
+import {contrastRecommendations} from './contrastRecs.js';
 
 const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   'vl-a11y-colorblind-safety': colorblindSafetyRecommendations,
@@ -39,6 +40,7 @@ const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   'vl-a11y-color-risk-rules': colorRiskRecommendations,
   'vl-a11y-color-only': colorOnlyEncodingRecommendations,
   'vl-a11y-font-size': fontSizeRecommendations,
+  'vl-a11y-contrast': contrastRecommendations,
 };
 
 /**

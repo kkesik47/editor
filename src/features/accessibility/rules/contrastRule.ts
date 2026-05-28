@@ -234,6 +234,7 @@ function buildScaleAAIssue(
       failingColors: result.failingColors,
       channel: result.channel,
       schemeName: result.schemeName ?? null,
+      scaleType: 'categorical', // only categorical scales reach this builder; see checkScaleContrast in contrastAnalysis.ts
       // Data for the hover preview SVG
       allColors: result.allColors,
       allRatios: result.allRatios,
