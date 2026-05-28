@@ -50,24 +50,16 @@ import {WCAG_CONTRAST_MIN, WCAG_CONTRAST_ENHANCED, WCAG_NON_TEXT_CONTRAST} from 
  * labels") rendered in the failing foreground color on the actual
  * background — letting the user see the legibility problem directly.
  */
-function buildTextAAIssue(
-  entry: TextContrastEntry,
-  bg: string,
-): AccessibilityIssue {
-  const severity = entry.source === 'default' ? 'info' : 'warning';
+function buildTextAAIssue(entry: TextContrastEntry, bg: string): AccessibilityIssue {
   const sourceLabel =
-    entry.source === 'default'
-      ? 'Vega-Lite default'
-      : entry.source === 'config'
-        ? 'config block'
-        : 'inline property';
+    entry.source === 'default' ? 'Vega-Lite default' : entry.source === 'config' ? 'config block' : 'inline property';
 
   const direction = isLightBackground(bg) ? 'darker' : 'lighter';
   const section = entry.configKey.split('.')[0];
 
   return {
     ruleId: 'vl-a11y-contrast:text-aa',
-    severity,
+    severity: 'warning',
 
     message:
       `${entry.label} contrast ratio is ${entry.contrastRatio}:1 ` +
@@ -104,10 +96,7 @@ function buildTextAAIssue(
  * This is a suggestion, not a requirement — the visualization is
  * already AA-compliant, but could be improved.
  */
-function buildTextAAAIssue(
-  entry: TextContrastEntry,
-  bg: string,
-): AccessibilityIssue {
+function buildTextAAAIssue(entry: TextContrastEntry, bg: string): AccessibilityIssue {
   const direction = isLightBackground(bg) ? 'darker' : 'lighter';
 
   return {
@@ -148,10 +137,7 @@ function buildTextAAAIssue(
  * SVG to show one swatch on the background — visually consistent with
  * how multi-color scale issues are rendered.
  */
-function buildMarkAAIssue(
-  entry: MarkContrastEntry,
-  bg: string,
-): AccessibilityIssue {
+function buildMarkAAIssue(entry: MarkContrastEntry, bg: string): AccessibilityIssue {
   const direction = isLightBackground(bg) ? 'darker' : 'lighter';
 
   return {
@@ -197,14 +183,9 @@ function buildMarkAAIssue(
  * Includes allColors, allRatios and backgroundColor so the renderer
  * can build a visual preview showing each swatch on the background.
  */
-function buildScaleAAIssue(
-  result: ScaleContrastResult,
-  bg: string,
-): AccessibilityIssue {
+function buildScaleAAIssue(result: ScaleContrastResult, bg: string): AccessibilityIssue {
   const count = result.failingColors.length;
-  const schemeNote = result.schemeName
-    ? ` (scheme '${result.schemeName}')`
-    : '';
+  const schemeNote = result.schemeName ? ` (scheme '${result.schemeName}')` : '';
 
   return {
     ruleId: 'vl-a11y-contrast:non-text-aa',
@@ -252,7 +233,7 @@ export const contrastRule: AccessibilityRule = {
     '(AA) or ≥ 7:1 (AAA) against the background; non-text graphical ' +
     'elements need ≥ 3:1 (AA). Scale contrast is only checked for ' +
     'categorical scales.',
-   references: [WCAG_CONTRAST_MIN, WCAG_CONTRAST_ENHANCED, WCAG_NON_TEXT_CONTRAST],
+  references: [WCAG_CONTRAST_MIN, WCAG_CONTRAST_ENHANCED, WCAG_NON_TEXT_CONTRAST],
   evaluate(spec: Record<string, any>): AccessibilityIssue[] {
     const result = analyzeContrast(spec);
     const bg = result.backgroundColor;
