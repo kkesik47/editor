@@ -256,31 +256,6 @@ export default function AccessibilityHeatmap() {
           </span>
         );
       })}
-
-      {/* Legend — explains the blob colours and the count badge. Sits in
-          a corner of the overlay, shows only the categories actually
-          present on the chart, and disappears with the overlay (toggle
-          off → whole overlay returns null). */}
-      <div className="a11y-legend">
-        {clusters.some((c) => c.severity === 'warning') && (
-          <span className="a11y-legend-item">
-            <span className="a11y-legend-swatch a11y-legend-swatch-warning" />
-            Warning
-          </span>
-        )}
-        {clusters.some((c) => c.severity === 'info') && (
-          <span className="a11y-legend-item">
-            <span className="a11y-legend-swatch a11y-legend-swatch-info" />
-            Suggestion
-          </span>
-        )}
-        {clusters.some((c) => c.count >= 2) && (
-          <span className="a11y-legend-item">
-            <span className="a11y-legend-badge-sample">2</span>
-            Multiple issues
-          </span>
-        )}
-      </div>
     </div>
   );
 }
