@@ -17,6 +17,16 @@
  *   - 'warning' when the author explicitly set a value that is too small
  *   - 'info'    when the Vega-Lite default is too small (gentle nudge)
  *
+ * Editor visibility:
+ *   - inline / config issues use 'underline' — the offending number is
+ *     in the source, so we underline it directly.
+ *   - default-source issues use 'underline-key' — the criticised value
+ *     is NOT in the source (nothing is written), so the pointer is an
+ *     anchor for the fix rather than the location of a value. We
+ *     underline the property key (e.g. `"y"`, `"axis"`, `"title"`)
+ *     instead of the value, which surfaces the issue in the editor
+ *     without falsely marking unrelated sibling properties.
+ *
  * Architecture:
  *   1. fontSizeAnalysis.ts — extract effective sizes and compare
  *   2. this file           — convert results into AccessibilityIssue objects
@@ -55,9 +65,14 @@ function configSectionName(configKey: string): string {
  *
  * Uses 'warning' severity for author-set values (they chose this)
  * and 'info' for Vega-Lite defaults (gentle nudge to configure).
+ *
+ * Default-source issues use 'underline-key' so the editor marks the
+ * property key (e.g. `"y"`, `"axis"`, `"title"`) rather than the
+ * whole value — see the file header for the rationale.
  */
 function buildIssue(entry: FontSizeEntry): AccessibilityIssue {
-  const severity = entry.source === 'default' ? 'info' : 'warning';
+  const isDefault = entry.source === 'default';
+  const severity = isDefault ? 'info' : 'warning';
 
   const sourceLabel =
     entry.source === 'default'
@@ -79,11 +94,16 @@ function buildIssue(entry: FontSizeEntry): AccessibilityIssue {
       `of ${entry.threshold} px for ${entry.role === 'title' ? 'titles' : 'labels'}.`,
 
     suggestion:
-      entry.source === 'default'
+      isDefault
         ? `Add "${property}": ${entry.threshold} to your ${section} configuration.`
         : `Increase "${property}" to at least ${entry.threshold}.`,
 
     jsonPointer: entry.jsonPointer,
+
+    // Inline/config issues underline the offending number. Default
+    // issues have no written value to point at, so we underline just
+    // the property key instead — see the file header.
+    editorVisibility: isDefault ? 'underline-key' : 'underline',
 
     evidence: {
       element: entry.label,

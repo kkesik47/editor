@@ -122,13 +122,40 @@ function toIssueDecorations(
     }
 
     const path = jsonPointerToPath(issue.jsonPointer);
-    const node = findNodeAtLocation(tree, path);
-    if (!node) {
+    const valueNode = findNodeAtLocation(tree, path);
+    if (!valueNode) {
       continue;
     }
 
-    const start = model.getPositionAt(node.offset);
-    const end = model.getPositionAt(node.offset + node.length);
+    // Skip issues that explicitly opt out of the wavy underline.
+    // They still surface in the problems panel (via toIssueMarkers).
+    if (issue.editorVisibility === 'marker-only') {
+      continue;
+    }
+
+  // Decide which range to underline:
+  //   'underline-key' — the property KEY (e.g. just `"y"`). Used
+  //                     when the pointer is an anchor for a fix
+  //                     rather than the location of a value the
+  //                     author wrote, so underlining the value
+  //                     would mark unrelated siblings as wrong.
+  //   anything else   — the value at the pointer (default).
+  let rangeNode = valueNode;
+  if (issue.editorVisibility === 'underline-key') {
+    const property = valueNode.parent;
+    const keyNode =
+      property && property.type === 'property' ? property.children?.[0] : null;
+    // No honest key to mark (root pointer, malformed tree) → skip
+    // silently rather than fall back to the value, which would be
+    // exactly the misleading underline we're trying to avoid.
+    if (!keyNode) {
+      continue;
+    }
+    rangeNode = keyNode;
+  }
+
+  const start = model.getPositionAt(rangeNode.offset);
+  const end = model.getPositionAt(rangeNode.offset + rangeNode.length);
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
@@ -202,6 +229,15 @@ function toIssueMarkers(
       continue;
     }
 
+    // Skip issues that explicitly opt out of the wavy underline.
+    // They still surface in the problems panel (via toIssueMarkers)
+    // and in the Accessibility tab. Used when an issue's pointer is
+    // an anchor for the fix rather than the location of the actual
+    // value being criticised — e.g. fontSizeRule defaults.
+
+  if (issue.editorVisibility === 'marker-only') {
+    continue;
+  }
     const path = jsonPointerToPath(issue.jsonPointer);
     const node = findNodeAtLocation(tree, path);
     if (!node) {
