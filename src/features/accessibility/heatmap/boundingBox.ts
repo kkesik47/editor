@@ -111,3 +111,56 @@ export function collectAbsoluteBoxes(root: SceneItem, accept: (item: SceneItem) 
   visit(root, 0, 0);
   return out;
 }
+
+/**
+ * Walk the scenegraph and return the absolute bounding box of each
+ * individual data mark — the symbols, rects, lines etc. that Vega
+ * draws to represent the data.
+ *
+ * Why this needs a separate walker from collectAbsoluteBoxes: a
+ * `role: 'mark'` scene item is the GROUP that wraps the data marks,
+ * and its bounds span the whole plot area. Using those bounds gives
+ * an overlay that always covers the entire plot — for three sparse
+ * scatter points, the bounding rectangle is the whole chart. We want
+ * one box per actual mark, so blobs sit on the marks themselves and
+ * clustering merges nearby ones.
+ *
+ * The walker switches into "inside mark group" mode at every
+ * `role: 'mark'` item and stays in it for all descendants. Inside
+ * that mode it records any leaf (non-group) scene item with bounds.
+
+ * Marktypes that render as ONE coherent visual per series rather than
+ * per data point. Going one level deeper into these doesn't help:
+ * line/area paths span the plot extent of their data, and arc wedges
+ * don't cluster cleanly with their neighbours. */
+const SPREAD_MARKTYPES = new Set(['line', 'area', 'trail', 'arc']);
+
+export function collectDataMarkBoxes(root: SceneItem): BoundingBox[] {
+  const out: BoundingBox[] = [];
+
+  const visit = (item: SceneItem, offsetX: number, offsetY: number, insideMarkGroup: boolean) => {
+    // Spread marktypes: record the mark group's own bounds as one box
+    // and stop descending. Per-leaf is the wrong granularity for these.
+    if (item.role === 'mark' && item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
+      const b = item.bounds;
+      out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
+      return;
+    }
+
+    // Discrete marktypes: record each leaf scene item inside the mark group.
+    const isLeaf = !item.items || item.items.length === 0;
+    if (insideMarkGroup && item.bounds && isLeaf) {
+      const b = item.bounds;
+      out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
+    }
+
+    const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+    const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+    const childInsideMarkGroup = insideMarkGroup || item.role === 'mark';
+
+    item.items?.forEach((child) => visit(child, childX, childY, childInsideMarkGroup));
+  };
+
+  visit(root, 0, 0, false);
+  return out;
+}

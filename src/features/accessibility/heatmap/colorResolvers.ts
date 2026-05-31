@@ -26,10 +26,9 @@
 
 import type {AccessibilityIssue} from '../types.js';
 import type {BoundingBox} from './boundingBox.js';
-import {collectAbsoluteBoxes} from './boundingBox.js';
+import {collectAbsoluteBoxes, collectDataMarkBoxes, unionBounds} from './boundingBox.js';
 import type {IssueResolver, ResolverContext} from './resolvers.js';
 import {channelFromLabel, channelFromPointer, locateTextElement, type TextElementKind} from './textElements.js';
-import {unionBounds} from './boundingBox.js';
 
 /**
  * Highlight the coloured data marks and the legend(s) that show the
@@ -38,13 +37,16 @@ import {unionBounds} from './boundingBox.js';
 export const colorScaleResolver: IssueResolver = (_issue: AccessibilityIssue, ctx: ResolverContext): BoundingBox[] => {
   const root = ctx.scenegraphRoot;
 
-  // The data marks coloured by the scale.
-  const marks = collectAbsoluteBoxes(root, (item) => item.role === 'mark');
+  // One box per individual data mark instead of one box over the
+  // entire mark group. With sparse marks (three scatter points, a
+  // few bars), the group's bounds cover the whole plot area; per-mark
+  // boxes keep the blobs on the marks themselves and let clustering
+  // merge nearby ones.
+  const marks = collectDataMarkBoxes(root);
 
-  // Use legend-entry (the coloured symbols + labels) instead of the
-  // whole legend group, so the legend title area stays separate.
-  // This prevents font-size issues on the legend title from being
-  // absorbed into this cluster.
+  // Legend entries (coloured symbols + labels) — coarse box per
+  // legend; the title stays separate so font-size issues there
+  // don't get absorbed into this cluster.
   const legendEntries = collectAbsoluteBoxes(root, (item) => item.role === 'legend-entry');
   const legendBox = unionBounds(legendEntries);
   const legends = legendBox ? [legendBox] : [];
