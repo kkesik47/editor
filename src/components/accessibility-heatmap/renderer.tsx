@@ -32,7 +32,7 @@ import {useLayoutEffect, useRef, useState} from 'react';
 import {useAppContext} from '../../context/app-context.js';
 import type {SceneItem} from '../../features/accessibility/heatmap/boundingBox.js';
 import {resolveIssueRegions, type IssueRegion} from '../../features/accessibility/heatmap/resolvers.js';
-import {clusterRegions} from '../../features/accessibility/heatmap/clustering.js';
+import {clusterRegions, orderByPrecedence} from '../../features/accessibility/heatmap/clustering.js';
 import './index.css';
 
 interface OverlayGeometry {
@@ -167,7 +167,7 @@ export default function AccessibilityHeatmap() {
   // hook order stays stable across renders, per React's rules.)
   if (!heatmapEnable || !geometry || regions.length === 0) return null;
 
-  const clusters = clusterRegions(regions);
+  const clusters = orderByPrecedence(clusterRegions(regions));
 
   // Project a scene-space point onto the displayed pixel box, for
   // placing HTML badges crisply outside the stretched SVG.

@@ -99,3 +99,25 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
     return {box, issues: [...byKey.values()], keys, severity, count: keys.length};
   });
 }
+
+/**
+ * Warnings take visual precedence over suggestions. Where a warning
+ * blob and a suggestion blob land on the same spot, drawing both
+ * (transparent fills) muddies them into grey. So we hide any
+ * suggestion cluster a warning cluster already covers: the user sees
+ * the orange (warning) blob, and once the warning is fixed the
+ * suggestion is no longer covered and its blue blob appears.
+ *
+ * Also returns clusters in paint order — suggestions first, warnings
+ * last — so warnings render on top (SVG paints in document order).
+ */
+export function orderByPrecedence(clusters: IssueCluster[]): IssueCluster[] {
+  const warnings = clusters.filter((c) => c.severity === 'warning');
+  const suggestions = clusters.filter((c) => c.severity === 'info');
+
+  const visibleSuggestions = suggestions.filter(
+    (s) => !warnings.some((w) => overlaps(s.box, w.box)),
+  );
+
+  return [...visibleSuggestions, ...warnings];
+}
