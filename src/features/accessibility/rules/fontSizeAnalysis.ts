@@ -15,9 +15,22 @@
  * The first defined value wins — this mirrors how Vega-Lite itself
  * resolves configuration.
  *
- * Checks are per-channel: each axis (x, y) and each legend channel
- * (color, size, etc.) is checked independently. This ensures the
- * underline points to the specific channel, not the whole encoding.
+ * Composition-aware:
+ *   The spec is walked as a tree, so font-bearing elements are found
+ *   inside layer / concat / facet compositions, not just at the top
+ *   level. (Without this, wrapping a chart in a `layer` — e.g. when the
+ *   colour-only fix adds a text-label layer — would hide every font
+ *   element from this rule.) Config is global, so it is always resolved
+ *   from the ROOT spec; inline values come from the local view node.
+ *
+ * One issue per RENDERED element:
+ *   Several spec locations can map to a single on-screen element:
+ *     - sibling layers SHARE one x-axis and one y-axis,
+ *     - channels mapping the SAME field SHARE one merged legend.
+ *   Reporting each spec location separately would surface duplicate
+ *   suggestions for what the reader sees as one element, so entries are
+ *   de-duplicated by an `elementKey` (see dedupeByElement). Concatenated
+ *   views do NOT share axes/legends, so their elements stay distinct.
  *
  * Two threshold tiers:
  *   - Title elements (chart title, axis titles, legend titles): 16 px
@@ -85,20 +98,32 @@ export interface FontSizeEntry {
    *   - default: the most specific existing parent where the fix goes:
    *              → /encoding/x/axis  (if axis object exists)
    *              → /encoding/x       (if no axis object yet)
+   *
+   * In a composition the pointer is prefixed with the view location,
+   * e.g. /layer/0/encoding/x/axis/labelFontSize.
    */
   jsonPointer: string;
+
+  /**
+   * Identity of the RENDERED element this entry describes, used to
+   * de-duplicate. Sibling layers share one x/y axis; channels on the
+   * same field share one merged legend — entries with the same key are
+   * collapsed to one. Keyed by coordinate system so concatenated views
+   * (which have their own axes/legends) are never merged together.
+   */
+  elementKey: string;
 }
 
 /** Result of analyzing all font sizes in a spec. */
 export interface FontSizeAnalysisResult {
-  /** All text elements that were checked. */
+  /** All text elements that were checked (after de-duplication). */
   entries: FontSizeEntry[];
 
   /** Entries that fell below their respective thresholds. */
   issues: FontSizeEntry[];
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
+// ─── Generic helpers ─────────────────────────────────────────────
 
 /**
  * Read a nested property from an object by following a path of keys.
@@ -106,12 +131,10 @@ export interface FontSizeAnalysisResult {
  */
 function readPath(obj: Record<string, any>, path: string[]): unknown {
   let current: any = obj;
-
   for (const key of path) {
     if (current == null || typeof current !== 'object') return undefined;
     current = current[key];
   }
-
   return current;
 }
 
@@ -142,15 +165,19 @@ interface ChannelFontSizeParams {
   defaultSize: number;
   /** JSON pointer for default issues (points to the best place to add the fix). */
   defaultPointer: string;
+  /** Rendered-element identity for de-duplication. */
+  elementKey: string;
 }
 
 /**
  * Resolve the effective font size for one property on one channel.
  *
- * Priority: inline → config → default.
+ * Priority: inline → config → default. Inline values come from the
+ * local view node (read by the caller into params.inlineValue); config
+ * is global and so is read here from `rootSpec`.
  */
 function resolveChannelFontSize(
-  spec: Record<string, any>,
+  rootSpec: Record<string, any>,
   params: ChannelFontSizeParams,
 ): FontSizeEntry {
   const threshold = params.role === 'title'
@@ -167,11 +194,12 @@ function resolveChannelFontSize(
       threshold,
       source: 'inline',
       jsonPointer: params.inlinePointer,
+      elementKey: params.elementKey,
     };
   }
 
-  // 2. Config block (applies to all channels of this type)
-  const configValue = readPath(spec, params.configPath);
+  // 2. Config block (applies to all channels of this type) — from ROOT
+  const configValue = readPath(rootSpec, params.configPath);
   if (typeof configValue === 'number') {
     return {
       label: params.label,
@@ -181,6 +209,7 @@ function resolveChannelFontSize(
       threshold,
       source: 'config',
       jsonPointer: '/' + params.configPath.join('/'),
+      elementKey: params.elementKey,
     };
   }
 
@@ -193,119 +222,145 @@ function resolveChannelFontSize(
     threshold,
     source: 'default',
     jsonPointer: params.defaultPointer,
+    elementKey: params.elementKey,
   };
 }
 
 // ─── Chart title check ──────────────────────────────────────────
 
 /**
- * Check the chart title font size.
+ * Check the chart title font size for one view node.
  *
  * Resolution order:
  *   1. title.fontSize (when title is an object)
  *   2. config.title.fontSize
  *   3. Vega-Lite default (13 px)
  *
- * Skipped entirely when the spec has no title property.
+ * Skipped entirely when the view has no title property.
  */
-function checkChartTitle(spec: Record<string, any>): FontSizeEntry | null {
-  if (spec?.title == null) return null;
+function checkChartTitle(
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
+  pointer: string,
+  cs: string,
+): FontSizeEntry | null {
+  if (node?.title == null) return null;
 
-  return resolveChannelFontSize(spec, {
+  return resolveChannelFontSize(rootSpec, {
     label: 'Chart title',
     configKey: 'title.fontSize',
     role: 'title',
-    inlineValue: typeof spec.title === 'object' && !Array.isArray(spec.title)
-      ? spec.title.fontSize
+    inlineValue: typeof node.title === 'object' && !Array.isArray(node.title)
+      ? node.title.fontSize
       : undefined,
-    inlinePointer: '/title/fontSize',
+    inlinePointer: `${pointer}/title/fontSize`,
     configPath: ['config', 'title', 'fontSize'],
     defaultSize: DEFAULT_TITLE_FONT_SIZE,
-    defaultPointer: '/title',
+    defaultPointer: `${pointer}/title`,
+    elementKey: `${cs}:title`,
   });
 }
 
 // ─── Per-axis checks ─────────────────────────────────────────────
 
-/** Axis-producing encoding channels. */
-const AXIS_CHANNELS = ['x', 'y', 'xOffset', 'yOffset'];
+/**
+ * Axis-producing encoding channels.
+ *
+ * Only x and y: xOffset / yOffset position marks within a band but
+ * render no labelled axis of their own, so they have no axis font to
+ * check. (For colour-only detection they're treated separately — see
+ * colorOnlyEncodingRule.)
+ */
+const AXIS_CHANNELS = ['x', 'y'];
 
 /** Human-readable labels for axis channels. */
 const AXIS_LABELS: Record<string, string> = {
   x: 'X-axis',
   y: 'Y-axis',
-  xOffset: 'X-offset axis',
-  yOffset: 'Y-offset axis',
 };
+
+/** Orientation of an axis channel: starts with 'x' yields 'x', otherwise 'y'. */
+function axisOrientation(channel: string): 'x' | 'y' {
+  return channel[0] === 'x' ? 'x' : 'y';
+}
 
 /**
  * Pick the best JSON pointer for a default axis font-size issue.
  *
- * If the author already has an `axis` object on this channel,
- * point to it — that's where they'd add `labelFontSize`.
- * Otherwise, point to the channel itself — they need to create
- * the `axis` block first.
+ * If the author already has an `axis` object on this channel, point to
+ * it — that's where they'd add `labelFontSize`. Otherwise point to the
+ * encoding channel — they need to create the `axis` block first.
  *
- * Examples:
  *   { "x": { "field": "date", "axis": { "title": "Date" } } }
- *   → pointer: /encoding/x/axis  (axis exists, add property here)
+ *   → pointer: <prefix>/encoding/x/axis  (axis exists, add property here)
  *
  *   { "x": { "field": "date" } }
- *   → pointer: /encoding/x  (no axis yet, create it here)
+ *   → pointer: <prefix>/encoding/x       (no axis yet, create it here)
  */
-function axisDefaultPointer(spec: Record<string, any>, channel: string): string {
-  const axisExists = hasObjectAtPath(spec, ['encoding', channel, 'axis']);
-  return axisExists
-    ? `/encoding/${channel}/axis`
-    : `/encoding/${channel}`;
+function axisDefaultPointer(
+  node: Record<string, any>,
+  channel: string,
+  pointer: string,
+): string {
+  return hasObjectAtPath(node, ['encoding', channel, 'axis'])
+    ? `${pointer}/encoding/${channel}/axis`
+    : `${pointer}/encoding/${channel}`;
 }
 
 /**
- * Check font sizes for one axis channel.
+ * Check font sizes for one axis channel on one view node.
  *
  * Resolution order (per property):
  *   1. encoding.[channel].axis.[property]
  *   2. config.axis.[property]
  *   3. Vega-Lite default
  *
- * Returns 0–2 entries (one for labels, one for title).
+ * Returns 0–2 entries (one for labels, one for title). Value channels
+ * (e.g. {"value": 40}) render no axis and are skipped.
  */
 function checkAxisChannel(
-  spec: Record<string, any>,
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
   channel: string,
+  pointer: string,
+  cs: string,
 ): FontSizeEntry[] {
-  const channelDef = spec?.encoding?.[channel];
+  const channelDef = node?.encoding?.[channel];
   if (!channelDef || typeof channelDef !== 'object') return [];
+  if ('value' in channelDef) return []; // value channel → no axis
 
   const axisLabel = AXIS_LABELS[channel] ?? channel;
-  const defaultPtr = axisDefaultPointer(spec, channel);
+  const defaultPtr = axisDefaultPointer(node, channel, pointer);
+  const orient = axisOrientation(channel);
   const entries: FontSizeEntry[] = [];
 
-  // Check labelFontSize
+  // Labels
   entries.push(
-    resolveChannelFontSize(spec, {
+    resolveChannelFontSize(rootSpec, {
       label: `${axisLabel} labels`,
       configKey: 'axis.labelFontSize',
       role: 'label',
       inlineValue: channelDef?.axis?.labelFontSize,
-      inlinePointer: `/encoding/${channel}/axis/labelFontSize`,
+      inlinePointer: `${pointer}/encoding/${channel}/axis/labelFontSize`,
       configPath: ['config', 'axis', 'labelFontSize'],
       defaultSize: DEFAULT_AXIS_LABEL_FONT_SIZE,
       defaultPointer: defaultPtr,
+      elementKey: `${cs}:axis:${orient}:label`,
     }),
   );
 
-  // Check titleFontSize
+  // Title
   entries.push(
-    resolveChannelFontSize(spec, {
+    resolveChannelFontSize(rootSpec, {
       label: `${axisLabel} title`,
       configKey: 'axis.titleFontSize',
       role: 'title',
       inlineValue: channelDef?.axis?.titleFontSize,
-      inlinePointer: `/encoding/${channel}/axis/titleFontSize`,
+      inlinePointer: `${pointer}/encoding/${channel}/axis/titleFontSize`,
       configPath: ['config', 'axis', 'titleFontSize'],
       defaultSize: DEFAULT_AXIS_TITLE_FONT_SIZE,
       defaultPointer: defaultPtr,
+      elementKey: `${cs}:axis:${orient}:title`,
     }),
   );
 
@@ -329,67 +384,164 @@ const LEGEND_LABELS: Record<string, string> = {
 
 /**
  * Pick the best JSON pointer for a default legend font-size issue.
- *
- * Same logic as axisDefaultPointer: point to the `legend` object
- * if it exists, otherwise to the channel itself.
+ * Same logic as axisDefaultPointer: point to the `legend` object if it
+ * exists, otherwise to the channel itself.
  */
-function legendDefaultPointer(spec: Record<string, any>, channel: string): string {
-  const legendExists = hasObjectAtPath(spec, ['encoding', channel, 'legend']);
-  return legendExists
-    ? `/encoding/${channel}/legend`
-    : `/encoding/${channel}`;
+function legendDefaultPointer(
+  node: Record<string, any>,
+  channel: string,
+  pointer: string,
+): string {
+  return hasObjectAtPath(node, ['encoding', channel, 'legend'])
+    ? `${pointer}/encoding/${channel}/legend`
+    : `${pointer}/encoding/${channel}`;
 }
 
 /**
- * Check font sizes for one legend channel.
+ * Check font sizes for one legend channel on one view node.
  *
  * Resolution order (per property):
  *   1. encoding.[channel].legend.[property]
  *   2. config.legend.[property]
  *   3. Vega-Lite default
  *
- * Returns 0–2 entries (one for labels, one for title).
+ * Returns 0–2 entries (one for labels, one for title). Value channels
+ * and field-less channels render no legend and are skipped. The
+ * elementKey is keyed on the FIELD, so channels mapping the same field
+ * (e.g. color + shape on "origin", merged by Vega-Lite into one legend)
+ * collapse to a single element.
  */
 function checkLegendChannel(
-  spec: Record<string, any>,
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
   channel: string,
+  pointer: string,
+  cs: string,
 ): FontSizeEntry[] {
-  const channelDef = spec?.encoding?.[channel];
+  const channelDef = node?.encoding?.[channel];
   if (!channelDef || typeof channelDef !== 'object') return [];
+  if ('value' in channelDef) return []; // value channel → no legend
+  if (typeof channelDef.field !== 'string') return []; // legend needs a field
 
+  const field = channelDef.field;
   const legendLabel = LEGEND_LABELS[channel] ?? channel;
-  const defaultPtr = legendDefaultPointer(spec, channel);
+  const defaultPtr = legendDefaultPointer(node, channel, pointer);
   const entries: FontSizeEntry[] = [];
 
-  // Check labelFontSize
+  // Labels
   entries.push(
-    resolveChannelFontSize(spec, {
+    resolveChannelFontSize(rootSpec, {
       label: `${legendLabel} labels`,
       configKey: 'legend.labelFontSize',
       role: 'label',
       inlineValue: channelDef?.legend?.labelFontSize,
-      inlinePointer: `/encoding/${channel}/legend/labelFontSize`,
+      inlinePointer: `${pointer}/encoding/${channel}/legend/labelFontSize`,
       configPath: ['config', 'legend', 'labelFontSize'],
       defaultSize: DEFAULT_LEGEND_LABEL_FONT_SIZE,
       defaultPointer: defaultPtr,
+      elementKey: `${cs}:legend:${field}:label`,
     }),
   );
 
-  // Check titleFontSize
+  // Title
   entries.push(
-    resolveChannelFontSize(spec, {
+    resolveChannelFontSize(rootSpec, {
       label: `${legendLabel} title`,
       configKey: 'legend.titleFontSize',
       role: 'title',
       inlineValue: channelDef?.legend?.titleFontSize,
-      inlinePointer: `/encoding/${channel}/legend/titleFontSize`,
+      inlinePointer: `${pointer}/encoding/${channel}/legend/titleFontSize`,
       configPath: ['config', 'legend', 'titleFontSize'],
       defaultSize: DEFAULT_LEGEND_TITLE_FONT_SIZE,
       defaultPointer: defaultPtr,
+      elementKey: `${cs}:legend:${field}:title`,
     }),
   );
 
   return entries;
+}
+
+// ─── Composition walk ────────────────────────────────────────────
+
+/** A view node in the spec tree, with its JSON-pointer prefix. */
+interface ViewNode {
+  node: Record<string, any>;
+  pointer: string;
+}
+
+/**
+ * Collect every view node in the spec, with its pointer prefix.
+ *
+ * Font-bearing elements live on units (encoding) and on view-level
+ * titles, both of which can appear inside layer / concat / facet
+ * compositions — not just at the top level. Container nodes (e.g. a
+ * bare layer wrapper) are included too: they carry no encoding so
+ * axis/legend checks skip them, but they may carry a `title`.
+ */
+function collectViewNodes(node: unknown, pointer: string, out: ViewNode[]): void {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+  const obj = node as Record<string, any>;
+  out.push({node: obj, pointer});
+
+  if (Array.isArray(obj.layer)) {
+    obj.layer.forEach((c: unknown, i: number) =>
+      collectViewNodes(c, `${pointer}/layer/${i}`, out));
+  }
+  for (const key of ['hconcat', 'vconcat', 'concat'] as const) {
+    if (Array.isArray(obj[key])) {
+      (obj[key] as unknown[]).forEach((c, i) =>
+        collectViewNodes(c, `${pointer}/${key}/${i}`, out));
+    }
+  }
+  if (obj.spec) collectViewNodes(obj.spec, `${pointer}/spec`, out);
+}
+
+/**
+ * The coordinate system a view belongs to, derived from its pointer.
+ * Layers SHARE one (one x-axis, one y-axis, merged legends), so a
+ * trailing "/layer/<n>" is stripped to collapse siblings; concatenated
+ * views keep their own pointer and stay separate.
+ *
+ *   ""            → ""            (root)
+ *   "/layer/0"    → ""            (layers share root's coord system)
+ *   "/hconcat/0"  → "/hconcat/0"  (its own coord system)
+ */
+function coordSystemOf(viewPointer: string): string {
+  return viewPointer.replace(/\/layer\/\d+$/, '');
+}
+
+// ─── De-duplication ──────────────────────────────────────────────
+
+/** Source specificity for tie-breaking dedupe (higher = more specific). */
+const SOURCE_RANK: Record<FontSizeEntry['source'], number> = {
+  inline: 3,
+  config: 2,
+  default: 1,
+};
+
+/**
+ * Collapse entries that describe the SAME rendered element to one.
+ *
+ * Keeps the most specific source (inline > config > default); on a tie,
+ * keeps the smaller size (the more conservative reading). This means an
+ * explicit value on a shared axis wins over another layer's default,
+ * rather than producing a phantom issue for a size that isn't rendered.
+ */
+function dedupeByElement(entries: FontSizeEntry[]): FontSizeEntry[] {
+  const byKey = new Map<string, FontSizeEntry>();
+  for (const entry of entries) {
+    const existing = byKey.get(entry.elementKey);
+    if (!existing) {
+      byKey.set(entry.elementKey, entry);
+      continue;
+    }
+    const better =
+      SOURCE_RANK[entry.source] > SOURCE_RANK[existing.source] ||
+      (SOURCE_RANK[entry.source] === SOURCE_RANK[existing.source] &&
+        entry.effectiveSize < existing.effectiveSize);
+    if (better) byKey.set(entry.elementKey, entry);
+  }
+  return [...byKey.values()];
 }
 
 // ─── Public API ──────────────────────────────────────────────────
@@ -397,18 +549,11 @@ function checkLegendChannel(
 /**
  * Analyze all font sizes in a Vega-Lite specification.
  *
- * Checks each text element individually:
- *   - Chart title (if present)
- *   - Each axis channel (x, y, etc.) — labels and title separately
- *   - Each legend channel (color, size, etc.) — labels and title separately
- *
- * Resolution per element: inline → config → Vega-Lite default.
- *
- * JSON pointer targeting:
- *   - Inline values → points to the value (underlines just `9`)
- *   - Config values → points to the config property
- *   - Defaults      → points to the axis/legend object if it exists,
- *                      otherwise to the encoding channel
+ * Walks every view (handles layer / concat / facet, not just a single
+ * top-level unit), checks the chart title, each axis channel, and each
+ * legend channel, then de-duplicates so there is one entry per rendered
+ * element. Config is resolved from the root spec; inline values from
+ * each view node.
  *
  * @param spec - A parsed Vega-Lite specification object.
  * @returns Analysis result with all entries and those below threshold.
@@ -418,22 +563,26 @@ export function analyzeFontSizes(
 ): FontSizeAnalysisResult {
   const entries: FontSizeEntry[] = [];
 
-  // Chart title
-  const titleEntry = checkChartTitle(spec);
-  if (titleEntry) {
-    entries.push(titleEntry);
+  const views: ViewNode[] = [];
+  collectViewNodes(spec, '', views);
+
+  for (const {node, pointer} of views) {
+    const cs = coordSystemOf(pointer);
+
+    const titleEntry = checkChartTitle(node, spec, pointer, cs);
+    if (titleEntry) entries.push(titleEntry);
+
+    if (node.encoding && typeof node.encoding === 'object') {
+      for (const channel of AXIS_CHANNELS) {
+        entries.push(...checkAxisChannel(node, spec, channel, pointer, cs));
+      }
+      for (const channel of LEGEND_CHANNELS) {
+        entries.push(...checkLegendChannel(node, spec, channel, pointer, cs));
+      }
+    }
   }
 
-  // Per-axis checks
-  for (const channel of AXIS_CHANNELS) {
-    entries.push(...checkAxisChannel(spec, channel));
-  }
-
-  // Per-legend checks
-  for (const channel of LEGEND_CHANNELS) {
-    entries.push(...checkLegendChannel(spec, channel));
-  }
-
-  const issues = entries.filter((entry) => entry.effectiveSize < entry.threshold);
-  return {entries, issues};
+  const deduped = dedupeByElement(entries);
+  const issues = deduped.filter((entry) => entry.effectiveSize < entry.threshold);
+  return {entries: deduped, issues};
 }

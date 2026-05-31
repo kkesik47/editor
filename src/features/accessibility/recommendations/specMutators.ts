@@ -18,6 +18,8 @@
 
 import type {VegaLiteSpec} from './types.js';
 
+const LABEL_FONT_SIZE_PX = 13;
+
 // ─── Pointer-aware mutators ─────────────────────────────────────
 
 /**
@@ -273,4 +275,68 @@ export function parentPointer(pointer: string): string {
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * Wrap a unit spec into a two-layer spec that adds text labels for a
+ * field, so a category encoded only via color also appears as
+ * readable text next to each datum (WCAG 1.4.1).
+ *
+ * Unlike shape / strokeDash, the `text` channel only renders on a
+ * `text` mark — you cannot add it to a point/bar/line. So the fix is
+ * structural: keep the original mark as layer 0, and add a sibling
+ * `text` mark (layer 1) that shares the same x/y and writes the field.
+ *
+ *   { "mark": "point", "encoding": { "x":…, "y":…, "color":… } }
+ *     ↓
+ *   { "layer": [
+ *       { "mark": "point", "encoding": { "x":…, "y":…, "color":… } },
+ *       { "mark": {"type":"text","dy":-8},
+ *         "encoding": { "x":…, "y":…, "text": {field,type} } }
+ *     ] }
+ *
+ * The x/y of the original encoding are copied onto the text layer so
+ * the labels sit at the same positions. If the unit has no x or y
+ * (rare for a color-only categorical chart), that channel is simply
+ * omitted from the text layer.
+ *
+ * `dy: -8` nudges labels just above each datum so they don't sit
+ * directly on top of the mark. It's a reasonable default; the author
+ * can adjust it afterwards.
+ */
+export function addTextLabelLayer(
+  spec: VegaLiteSpec,
+  unitPointer: string,
+  label: {field: string; type: string},
+): VegaLiteSpec {
+  return updateAt(spec, unitPointer, (node) => {
+    const unit = (node as Record<string, unknown>) ?? {};
+    const encoding = (unit.encoding as Record<string, unknown>) ?? {};
+
+    // Reuse the positional channels so labels line up with the marks.
+    const positional: Record<string, unknown> = {};
+    if (encoding.x !== undefined) positional.x = encoding.x;
+    if (encoding.y !== undefined) positional.y = encoding.y;
+
+    // Layer 0: the original mark + encoding, untouched.
+    const originalLayer: Record<string, unknown> = {
+      mark: unit.mark,
+      encoding,
+    };
+
+    // Layer 1: a text mark writing the category field.
+    const textLayer: Record<string, unknown> = {
+      mark: {type: 'text', dy: -8, fontSize: LABEL_FONT_SIZE_PX},
+      encoding: {
+        ...positional,
+        text: {field: label.field, type: label.type},
+      },
+    };
+
+    // Preserve any unit-level properties that aren't mark/encoding
+    // (e.g. transform, name) by carrying them onto the wrapper.
+    const {mark: _m, encoding: _e, ...rest} = unit;
+
+    return {...rest, layer: [originalLayer, textLayer]};
+  });
 }

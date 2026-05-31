@@ -36,7 +36,7 @@
 
 import type {AccessibilityIssue} from '../types.js';
 import type {Recommendation} from './types.js';
-import {setEncodingChannel, convertMarkToPoint, parentPointer} from './specMutators.js';
+import {setEncodingChannel, convertMarkToPoint, parentPointer, addTextLabelLayer} from './specMutators.js';
 
 // ─── Mark groupings ──────────────────────────────────────────────
 
@@ -219,27 +219,55 @@ export const addStrokeDashEncoding = buildAddChannel({
     evidence.markType != null && STROKE_DASH_MARKS.includes(evidence.markType),
 });
 
-export const addColumnFacet = buildAddChannel({
-  id: 'color-only-add-column-facet',
-  label: 'Split into small multiples',
+/**
+ * Add text labels for the category field.
+ *
+ * Written out explicitly (not via buildAddChannel) because the fix is
+ * structural — it wraps the unit in a `layer` and adds a `text` mark,
+ * rather than adding a channel to the existing encoding block.
+ *
+ * Applies to ANY mark type: text labels are the one redundant
+ * encoding that works everywhere (points, bars, lines, areas). That
+ * universality is also the reason it's ordered last among the
+ * non-structural fixes — it's the catch-all when shape/strokeDash
+ * don't fit the mark.
+ */
+export const addTextLabels: Recommendation = {
+  id: 'color-only-add-text-labels',
+  label: 'Add text labels',
   description:
-    'Gives each category its own column (small multiples), so categories ' +
-    'are separated by position instead of color. The most robust fix — ' +
-    'works for any mark type, including bars and areas — but uses more ' +
-    'space and changes the layout.',
-  channel: 'column',
-  family: 'restructure',
-  // Faceting via encoding.column is only valid on a top-level unit
-  // spec. Inside a layer / concat the encoding parent isn't '/encoding'
-  // (it's e.g. '/layer/0/encoding'), and column there is invalid — those
-  // would need the heavier `facet` operator, out of scope for now.
-  appliesTo: (_evidence, issue) => encodingPointerFor(issue) === '/encoding',
-});
+    'Writes the category name as text next to each datum, so the ' +
+    'category is readable without relying on color. Works for any mark ' +
+    'type, but can clutter dense charts with many points.',
+  family: 'redundancy',
+
+  applicableWhen(issue) {
+    // No mark-type gate: text labels apply to every mark. We only
+    // need the field name + type from evidence to build the label.
+    return readColorOnlyEvidence(issue) != null;
+  },
+
+  apply(issue, spec) {
+    const evidence = readColorOnlyEvidence(issue);
+    if (!evidence) return spec;
+
+    // The unit that owns this encoding is one level above the
+    // encoding pointer:  /encoding → ''(root) ,  /layer/0/encoding → /layer/0
+    const unitPointer = parentPointer(encodingPointerFor(issue));
+
+    return addTextLabelLayer(spec, unitPointer, {
+      field: evidence.fieldName,
+      type: evidence.fieldType,
+    });
+  },
+};
+
+
 
 // ─── Registry ────────────────────────────────────────────────────
 
 export const colorOnlyEncodingRecommendations: Recommendation[] = [
   addShapeEncoding,
   addStrokeDashEncoding,
-  addColumnFacet,
+  addTextLabels,
 ];
