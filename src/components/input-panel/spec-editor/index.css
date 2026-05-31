@@ -17,8 +17,15 @@
 
 /* ── Accessibility decorations: warnings (Level A / AA) ────────── */
 
-/* Warning — primary, sits closer to the text */
-.a11yInlineDecoration {
+/* Warning underline — orange, primary. The compound selector makes the
+   warning WIN when a suggestion underline covers the same characters:
+   Monaco puts both class names on one span, and a span can only show a
+   single wavy underline, so the higher-specificity rule decides the
+   colour. Orange shows wherever a warning is present (alone or over a
+   suggestion); blue only where there's no warning — so fixing a warning
+   lets the blue reappear there. */
+.a11yInlineDecoration,
+.a11ySuggestionInlineDecoration.a11yInlineDecoration {
   text-decoration: underline wavy #d28a00;
   text-decoration-thickness: 1.5px;
   text-underline-offset: 2px;
