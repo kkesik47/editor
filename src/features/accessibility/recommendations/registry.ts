@@ -32,6 +32,7 @@ import {colorOnlyEncodingRecommendations} from './colorOnlyEncodingRecs.js';
 import {fontSizeRecommendations} from './fontSizeRecs.js';
 import {contrastRecommendations} from './contrastRecs.js';
 import {lightnessContrastRecommendations} from './lightnessContrastRecs.js';
+import {perceptualUniformityRecommendations} from './perceptualUniformityRecs.js';
 
 const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   'vl-a11y-colorblind-safety': colorblindSafetyRecommendations,
@@ -43,6 +44,7 @@ const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   'vl-a11y-font-size': fontSizeRecommendations,
   'vl-a11y-contrast': contrastRecommendations,
   'vl-a11y-lightness-contrast': lightnessContrastRecommendations,
+  'vl-a11y-perceptual-uniformity': perceptualUniformityRecommendations,
 };
 
 /**

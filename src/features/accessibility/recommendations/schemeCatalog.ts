@@ -119,15 +119,6 @@ export const SCHEME_CATALOG: SchemeEntry[] = [
     cvdSafe: true,
     notes: 'Perceptually uniform, magenta-to-yellow progression.',
   },
-  {
-    name: 'turbo',
-    type: 'sequential',
-    hueFamily: 'rainbow-like',
-    cvdSafe: true,
-    notes:
-      'Perceptually improved rainbow. Preserves high dynamic range while ' +
-      'being substantially safer under simulated CVD than classic rainbow.',
-  },
 
   // ─── Diverging CVD-safer schemes ──────────────────────────
   {
@@ -174,6 +165,19 @@ export const SCHEME_CATALOG: SchemeEntry[] = [
     cvdSafe: false,
     notes: 'Rainbow-like diverging; CVD-unsafe across most types.',
   },
+
+  // ─── Sequential single-hue (hue-preserving) ───────────────
+  {name: 'blues',   type: 'sequential', hueFamily: 'cool',    cvdSafe: true,  notes: 'Single blue hue, light→dark. Keeps a blue identity; safe in grayscale.'},
+  {name: 'reds',    type: 'sequential', hueFamily: 'warm',    cvdSafe: true,  notes: 'Single red hue, light→dark.'},
+
+  // ─── Sequential multi-hue (ColorBrewer) ───────────────────
+  {name: 'bluegreen',       type: 'sequential', hueFamily: 'cool', cvdSafe: true, notes: 'Blue→green progression, cool feel.'},
+  {name: 'yelloworangered', type: 'sequential', hueFamily: 'warm', cvdSafe: true, notes: 'Warm yellow→orange→red.'},
+
+  // ─── Diverging (ColorBrewer) ──────────────────────────────
+  {name: 'purplegreen',     type: 'diverging', hueFamily: 'multi', cvdSafe: true,  notes: 'Purple↔green diverging.'},
+  {name: 'pinkyellowgreen', type: 'diverging', hueFamily: 'multi', cvdSafe: false, notes: 'Pink↔green; the pink–green axis is weak under deuteranopia.'},
+  {name: 'redyellowblue',   type: 'diverging', hueFamily: 'multi', cvdSafe: true,  notes: 'Red↔blue through a light yellow midpoint.'},
 ];
 
 const DEFAULTS_BY_TYPE: Record<SchemeType, string> = {
