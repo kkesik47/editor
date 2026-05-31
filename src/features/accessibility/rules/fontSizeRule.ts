@@ -14,8 +14,9 @@
  * defaults, then flags any element that falls below its threshold.
  *
  * Severity:
- *   - 'warning' when the author explicitly set a value that is too small
- *   - 'info'    when the Vega-Lite default is too small (gentle nudge)
+ *     Always 'info'. Font size is a readability concern, so it is surfaced as a suggestion
+ *     rather than a warning — whether the value was set inline/in config
+ *     or inherited from a Vega-Lite default.
  *
  * Editor visibility:
  *   - inline / config issues use 'underline' — the offending number is
@@ -72,7 +73,9 @@ function configSectionName(configKey: string): string {
  */
 function buildIssue(entry: FontSizeEntry): AccessibilityIssue {
   const isDefault = entry.source === 'default';
-  const severity = isDefault ? 'info' : 'warning';
+  // every font issue is a suggestion — regardless of whether the too-small value
+  // was authored or inherited from a default
+  const severity = 'info';
 
   const sourceLabel =
     entry.source === 'default'
