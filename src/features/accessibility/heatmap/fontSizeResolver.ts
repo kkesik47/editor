@@ -42,7 +42,9 @@ export const fontSizeResolver: IssueResolver = (issue: AccessibilityIssue, ctx: 
 
   // Prefer the channel named in the pointer; fall back to the label for
   // config-level issues whose pointer has no channel in it.
-  const channel = channelFromPointer(issue.jsonPointer) ?? channelFromLabel(String(evidence.element ?? ''));
+  const channel =
+    channelFromPointer(issue.jsonPointer) ??
+    channelFromLabel(typeof evidence.element === 'string' ? evidence.element : '');
 
   return locateTextElement(kind, channel, ctx.scenegraphRoot);
 };

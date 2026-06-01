@@ -197,6 +197,17 @@ export const NUNEZ_2018: Reference = {
   type: 'paper',
 };
 
+export const SMITH_VAN_DER_WALT_2015: Reference = {
+  id: 'smith-van-der-walt-2015',
+  shortCitation: 'Smith & van der Walt, 2015',
+  fullCitation:
+    'Smith, N., & van der Walt, S. (2015). A Better Default Colormap for Matplotlib ' +
+    '[Conference presentation]. SciPy 2015, Austin, TX, United States.',
+  // Canonical project page (the talk itself is at https://www.youtube.com/watch?v=xAoljeRJ3lU).
+  url: 'https://bids.github.io/colormap/',
+  type: 'web',
+};
+
 export const BERGMAN_1995: Reference = {
   id: 'bergman-rogowitz-treinish-1995',
   shortCitation: 'Bergman et al., 1995',
@@ -281,6 +292,7 @@ export const REFERENCES = {
   CRAMERI_2020,
   MORELAND_2009,
   NUNEZ_2018,
+  SMITH_VAN_DER_WALT_2015,
   BERGMAN_1995,
   // Typography
   LEGGE_BIGELOW_2011,

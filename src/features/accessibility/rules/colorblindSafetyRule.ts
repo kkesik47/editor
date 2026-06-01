@@ -32,7 +32,47 @@ import {
   SEQUENTIAL_DISTANT_THRESHOLD,
 } from './colorblindSafety/cvdSimulation.js';
 import { debugCvdDeltaE } from './colorblindSafety/cvdSimulation.js';
-import {MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018} from '../references.js';
+import {
+  MACHADO_2009,
+  SHARMA_CIEDE_2005,
+  BIRCH_2012,
+  NUNEZ_2018,
+  SMITH_VAN_DER_WALT_2015,
+} from '../references.js';
+
+// ─── Trusted sequential schemes ──────────────────────────────────
+
+/**
+ * Sequential colormaps whose CVD-safety is established in the published
+ * literature, so we trust them by name instead of running the pairwise
+ * ΔE check on their resolved colors.
+ *
+ *   - viridis, plasma, inferno, magma:
+ *       Smith & van der Walt (2015). Designed with CVD-safety as an
+ *       explicit goal; evaluated and endorsed by Crameri et al. (2020).
+ *   - cividis:
+ *       Nuñez et al. (2018). Optimised for CVD viewers.
+ *
+ * The trust is granted only when the scale is used sequentially, which
+ * is how these colormaps are designed and evaluated. Categorical samples
+ * from these schemes are an off-label use and still go through the full
+ * pairwise check.
+ */
+const CVD_SAFE_SEQUENTIAL_SCHEMES = new Set<string>([
+  'viridis',
+  'plasma',
+  'inferno',
+  'magma',
+  'cividis',
+]);
+
+function isPublishedCvdSafe(scale: ResolvedScale): boolean {
+  return (
+    scale.scaleType === 'sequential' &&
+    scale.schemeName != null &&
+    CVD_SAFE_SEQUENTIAL_SCHEMES.has(scale.schemeName.toLowerCase())
+  );
+}
 
 // ─── Human-readable names for CVD types ──────────────────────────
 
@@ -139,7 +179,7 @@ export const colorblindSafetyRule: AccessibilityRule = {
     'Simulates color vision deficiencies (protanopia, deuteranopia, ' +
     'tritanopia) on explicit color scales and checks whether the ' +
     'colors remain perceptually distinguishable using CIEDE2000.',
-  references: [MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018],
+  references: [MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018, SMITH_VAN_DER_WALT_2015],
   evaluate(spec: Record<string, unknown>): AccessibilityIssue[] {
     // Step 1: Find all explicit color scales and resolve them to colors.
     // For categorical scales this also slices the color list down to
@@ -150,6 +190,10 @@ export const colorblindSafetyRule: AccessibilityRule = {
     const issues: AccessibilityIssue[] = [];
 
     for (const scale of scales) {
+      // Trust published CVD-safe sequential schemes by name — see
+      // CVD_SAFE_SEQUENTIAL_SCHEMES above for the literature backing.
+      if (isPublishedCvdSafe(scale)) continue;
+
       console.log('[CVD debug] scale:', scale.channel, scale.colors, 'used count:', scale.usedCategoryCount);
       debugCvdDeltaE(scale.colors, scale.scaleType);
 

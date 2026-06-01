@@ -80,7 +80,7 @@ export const contrastResolver: IssueResolver = (issue: AccessibilityIssue, ctx: 
   }
 
   // Text contrast — same target elements as fontSize.
-  const label = String(evidence.elementLabel ?? '');
+  const label = typeof evidence.elementLabel === 'string' ? evidence.elementLabel : '';
   const kind = kindFromContrastLabel(label);
   if (!kind) return [];
 

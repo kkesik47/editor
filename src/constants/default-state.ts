@@ -71,6 +71,7 @@ export type State = {
   accessibilityIssues: AccessibilityIssue[];
   heatmapEnable: boolean;
   focusedIssueKey: string | null;  // initial: null
+  hoveredIssueKeys: string[];  // initial: []
 };
 
 export const DEFAULT_STATE: State = {
@@ -127,4 +128,5 @@ export const DEFAULT_STATE: State = {
   accessibilityIssues: [],
   heatmapEnable: true,
   focusedIssueKey: null,
+  hoveredIssueKeys: [],
 };
