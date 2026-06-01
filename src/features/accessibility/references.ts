@@ -130,6 +130,24 @@ export const BIRCH_2012: Reference = {
   type: 'paper',
 };
 
+export const WONG_2011: Reference = {
+  id: 'wong-2011',
+  shortCitation: 'Wong, 2011',
+  fullCitation: 'Wong, B. (2011). Points of view: Color blindness. Nature Methods, 8(6), 441.',
+  url: 'https://doi.org/10.1038/nmeth.1618',
+  type: 'paper',
+};
+
+export const OKABE_ITO_2008: Reference = {
+  id: 'okabe-ito-2008',
+  shortCitation: 'Okabe & Ito, 2008',
+  fullCitation:
+    'Okabe, M., & Ito, K. (2008). Color Universal Design (CUD): How to Make ' +
+    'Figures and Presentations That Are Friendly to Colorblind People. J*Fly.',
+  url: 'https://jfly.uni-koeln.de/color/',
+  type: 'web',
+};
+
 export const SHARMA_CVD_2023: Reference = {
   id: 'sharma-cvd-2023',
   shortCitation: 'Sharma, 2023',
@@ -219,6 +237,16 @@ export const BERGMAN_1995: Reference = {
   type: 'paper',
 };
 
+export const HARROWER_BREWER_2003: Reference = {
+  id: 'harrower-brewer-2003',
+  shortCitation: 'Harrower & Brewer, 2003',
+  fullCitation:
+    'Harrower, M., & Brewer, C. A. (2003). ColorBrewer.org: An Online Tool for ' +
+    'Selecting Colour Schemes for Maps. The Cartographic Journal, 40(1), 27–37.',
+  url: 'https://doi.org/10.1179/000870403235002042',
+  type: 'paper',
+};
+
 // ─── Typography and readability ──────────────────────────────────
 
 export const LEGGE_BIGELOW_2011: Reference = {
@@ -284,6 +312,8 @@ export const REFERENCES = {
   BRETTEL_1997,
   MACHADO_2009,
   BIRCH_2012,
+  WONG_2011,
+  OKABE_ITO_2008,
   SHARMA_CVD_2023,
   // Color difference
   SHARMA_CIEDE_2005,
@@ -294,6 +324,7 @@ export const REFERENCES = {
   NUNEZ_2018,
   SMITH_VAN_DER_WALT_2015,
   BERGMAN_1995,
+  HARROWER_BREWER_2003,
   // Typography
   LEGGE_BIGELOW_2011,
   RELLO_2016,

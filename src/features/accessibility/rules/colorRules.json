@@ -118,47 +118,30 @@
       "message": "The visualization combines red and green families, which can be difficult to distinguish for users with common red-green color vision deficiencies.",
       "suggestion": "Use a colorblind-safe palette (e.g., blue/orange) or add shape, pattern, labels, or direct annotations.",
       "cvdTypes": ["protanopia", "deuteranopia"],
-      "rationale": "Red-green confusions are among the most common CVD-related failures in categorical encodings."
+      "rationale": "Red-green confusions are among the most common CVD-related failures in categorical encodings.",
+      "references": ["wong-2011", "okabe-ito-2008", "birch-2012", "sharma-cvd-2023"]
     },
     {
       "id": "purple-blue",
       "label": "Purple/Blue proximity",
       "families": ["purple", "blue"],
-      "severity": "info",
+      "severity": "warning",
       "message": "Purple and blue can become hard to separate at small sizes or low contrast.",
       "suggestion": "Increase lightness separation or add non-color encoding channels.",
       "cvdTypes": ["tritanopia"],
-      "rationale": "Blue-purple hues can cluster perceptually, especially in legends and thin marks."
-    },
-    {
-      "id": "red-black",
-      "label": "Red/Black contrast ambiguity",
-      "families": ["red", "black"],
-      "severity": "warning",
-      "message": "Red and black combinations can lose category distinction in low-lightness contexts.",
-      "suggestion": "Lift red lightness/chroma or replace black with a lighter neutral.",
-      "cvdTypes": ["protanopia", "deuteranopia"],
-      "rationale": "Dark reds can collapse toward black for some viewers and at small visual scales."
+      "rationale": "Blue-purple hues can cluster perceptually, especially in legends and thin marks.",
+      "references": ["wong-2011", "crameri-shephard-heron-2020"]
     },
     {
       "id": "brown-green-red",
       "label": "Brown/Green/Red triad",
       "families": ["brown", "green", "red"],
       "severity": "warning",
-      "message": "The brown-green-red triad can be especially ambiguous in thematic maps and stacked marks.",
+      "message": "The brown-green-red combination can be especially ambiguous in thematic maps and stacked marks.",
       "suggestion": "Use distinct hue families plus texture or symbols for robust differentiation.",
       "cvdTypes": ["protanopia", "deuteranopia"],
-      "rationale": "This triad combines multiple warm/earth tones often reported as hard to separate."
-    },
-    {
-      "id": "green-black",
-      "label": "Green/Black dark-range pairing",
-      "families": ["green", "black"],
-      "severity": "info",
-      "message": "Green paired with black can become difficult to parse when mark area is small.",
-      "suggestion": "Use brighter green shades and increase line/mark thickness or add labels.",
-      "cvdTypes": ["deuteranopia"],
-      "rationale": "Low-lightness greens can become visually merged with dark neutrals."
+      "rationale": "This triad combines multiple warm/earth tones often reported as hard to separate.",
+      "references": ["harrower-brewer-2003"]
     }
   ]
 }
