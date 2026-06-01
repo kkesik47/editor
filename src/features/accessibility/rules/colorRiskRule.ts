@@ -1,7 +1,7 @@
 import {parse, converter} from 'culori';
 import {AccessibilityIssue, AccessibilityIssueSeverity, AccessibilityRule} from '../types.js';
 import colorRules from './colorRules.json';
-import {BIRCH_2012, SHARMA_CVD_2023, CRAMERI_2020, WCAG_USE_OF_COLOR} from '../references.js';
+import {BIRCH_2012, SHARMA_CVD_2023, CRAMERI_2020} from '../references.js';
 
 type ColorFamilyThresholds = {
   saturationMin?: number;
@@ -344,6 +344,6 @@ export const colorRiskRule: AccessibilityRule = {
   id: 'vl-a11y-color-risk-engine',
   description:
     'Evaluates color-family combination risks using declarative JSON configuration and HSL-based family matching.',
-  references: [BIRCH_2012, SHARMA_CVD_2023, CRAMERI_2020, WCAG_USE_OF_COLOR],
+  references: [BIRCH_2012, SHARMA_CVD_2023, CRAMERI_2020],
   evaluate: (spec: Record<string, any>): AccessibilityIssue[] => evaluateColorCombinationRisk(spec, rules),
 };

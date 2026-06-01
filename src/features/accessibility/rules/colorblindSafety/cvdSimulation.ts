@@ -4,7 +4,7 @@
  * Simulates color vision deficiencies (CVD) on a set of colors and
  * measures whether the colors remain distinguishable afterward.
  *
- * Uses the Brettel–Viénot–Mollon model via the `culori` library for
+ * Uses the Machado, Oliveira & Fernandes (2009) model via the `culori` library for
  * physiologically accurate CVD simulation, and CIEDE2000 (ΔE₀₀) for
  * perceptually-weighted color difference measurement.
  *
@@ -30,9 +30,13 @@
  *   gradient behavior, not a defect.
  *
  * References:
- *   Brettel, H., Viénot, F., & Mollon, J.D. (1997).
- *   "Computerized simulation of color appearance for dichromats."
- *   Journal of the Optical Society of America A, 14(10), 2647–2655.
+ *   Machado, G. M., Oliveira, M. M., & Fernandes, L. A. F. (2009).
+ *   "A physiologically-based model for simulation of color vision deficiency."
+ *   IEEE Transactions on Visualization and Computer Graphics, 15(6), 1291–1298.
+ *
+ *   culori implements this model with the precomputed matrices published by
+ *   the authors. At full severity (1.0) the dichromacy result is calibrated
+ *   to agree with the earlier Brettel–Viénot–Mollon (1997) model.
  */
 
 import {
@@ -114,7 +118,7 @@ export const CATEGORICAL_THRESHOLD = 5;
  */
 export const SEQUENTIAL_DISTANT_THRESHOLD = 7;
 
-/** Severity of the Brettel simulation (1.0 = full dichromacy). */
+/** Severity of the simulated deficiency (1.0 = full dichromacy). */
 const CVD_SEVERITY = 1.0;
 
 // ─── CVD simulators (one per deficiency type) ────────────────────
