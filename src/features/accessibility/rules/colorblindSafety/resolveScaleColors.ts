@@ -120,13 +120,39 @@ function isDivergingScheme(name: unknown): boolean {
 
 // ─── Scheme resolution ──────────────────────────────────────────
 
+/** Options controlling how a named scheme is resolved to concrete colors. */
+interface ResolveSchemeOptions {
+  /** Categorical / sequential / diverging — decides the sampling strategy. */
+  scaleType: ScaleType;
+  /**
+   * For categorical scales, how many categories the data actually uses.
+   * Null when unknown (e.g. data loaded from a URL).
+   */
+  categoryCount: number | null;
+  /** Explicit scheme `count` from the object form { name, count }, if any. */
+  count?: number;
+  /** Explicit scheme `extent` from the object form, if any. */
+  extent?: [number, number];
+}
+
 /**
- * Resolve a named Vega/D3 color scheme to an array of hex strings.
+ * Resolve a named Vega/D3 color scheme to an array of CSS color strings.
+ *
+ * Continuous schemes (rainbow, viridis, …) are interpolator functions and
+ * must be SAMPLED. How we sample depends on the scale type:
+ *
+ *   categorical → one color per category, sampled the way Vega assigns
+ *                 colors to an ordinal/nominal scale. This is what makes
+ *                 the resolved colors match the ones Vega actually renders.
+ *   sequential  → dense, even sampling across the full range, so the CVD
+ *   / diverging   analysis can detect fold-over between distant points.
+ *
+ * Discrete schemes (tableau10, …) are plain arrays; trimming them to the
+ * used category count happens later, in maybeSliceCategorical.
  */
 function resolveNamedScheme(
   name: string,
-  count?: number,
-  extent?: [number, number],
+  opts: ResolveSchemeOptions,
 ): string[] | null {
   let schemeValue: unknown;
 
@@ -140,14 +166,26 @@ function resolveNamedScheme(
     return null;
   }
 
-  // Continuous / sequential / diverging scheme → interpolator function
+  // Continuous scheme → interpolator function.
   if (typeof schemeValue === 'function') {
-    return sampleInterpolator(schemeValue as (t: number) => string, count, extent);
+    const interpolator = schemeValue as (t: number) => string;
+
+    // Categorical: pick exactly one color per category, matching the
+    // Vega renderer. An explicit scheme.count takes precedence over the
+    // category count we inferred from the data.
+    const categoricalCount = opts.count ?? opts.categoryCount ?? null;
+    if (opts.scaleType === 'categorical' && categoricalCount != null) {
+      return sampleCategoricalInterpolator(interpolator, categoricalCount);
+    }
+
+    // Sequential / diverging (or categorical with unknown count):
+    // dense, even sampling across the whole range.
+    return sampleInterpolator(interpolator, opts.count, opts.extent);
   }
 
   // Discrete / categorical scheme → array
   if (Array.isArray(schemeValue)) {
-    return resolveDiscreteScheme(schemeValue, count);
+    return resolveDiscreteScheme(schemeValue, opts.count);
   }
 
   return null;
@@ -165,6 +203,31 @@ function sampleInterpolator(
     const t = n === 1 ? (lo + hi) / 2 : lo + (i / (n - 1)) * (hi - lo);
     return interpolator(t);
   });
+}
+
+/**
+ * Sample a continuous interpolator the way Vega assigns colors to an
+ * ordinal / nominal (categorical) scale: `count` colors taken at
+ * t = (i + 1) / (count + 1).
+ *
+ * The crucial detail is that Vega skips the t = 0 and t = 1 endpoints, so
+ * categorical colors never land on the extreme ends of a scheme — which
+ * are often near-black or near-white, or (for the cyclical "rainbow"
+ * scheme) the same purple at both ends. Reproducing this spacing is what
+ * makes our resolved colors match the swatches Vega actually renders:
+ * rainbow with 3 categories → coral / yellow-green / teal, NOT the
+ * purple/magenta start of the scheme.
+ *
+ * Verified against vega-lite v6 for the rainbow and viridis schemes,
+ * category counts 2–7.
+ */
+function sampleCategoricalInterpolator(
+  interpolator: (t: number) => string,
+  count: number,
+): string[] {
+  return Array.from({length: count}, (_, i) =>
+    interpolator((i + 1) / (count + 1)),
+  );
 }
 
 function resolveDiscreteScheme(schemeValue: unknown[], count?: number): string[] | null {
@@ -271,30 +334,32 @@ function inferScaleType(encodingDef: Record<string, unknown>): ScaleType {
 // ─── Slicing helper ──────────────────────────────────────────────
 
 /**
- * For categorical scales, slice the resolved colors down to the
- * actual category count if we can determine it.
+ * For categorical scales, trim the resolved colors down to the actual
+ * category count, given a precomputed count from resolveCategoryCount.
  *
  * Returns a tuple of [slicedColors, usedCategoryCount or undefined].
+ *
+ * Continuous schemes are already sampled to exactly `categoryCount`
+ * colors (see resolveNamedScheme), so the slice below is a no-op for
+ * them; it still trims discrete schemes and explicit ranges.
  *
  * Sequential / diverging scales are never sliced — see file header.
  */
 function maybeSliceCategorical(
-  spec: Record<string, unknown>,
-  channelDef: Record<string, unknown>,
   scaleType: ScaleType,
   colors: string[],
+  categoryCount: number | null,
 ): {colors: string[]; usedCategoryCount?: number} {
-  if (scaleType !== 'categorical') return {colors};
+  if (scaleType !== 'categorical' || categoryCount == null) return {colors};
 
-  const count = resolveCategoryCount(spec, channelDef);
-  if (count == null) return {colors};
-
-  // Don't expand: if the data has more categories than the scheme,
+  // Don't expand: if the data has more categories than the palette,
   // Vega-Lite will recycle colors and the user already has bigger
   // problems than CVD safety. Leave as-is and let other rules speak.
-  if (count >= colors.length) return {colors, usedCategoryCount: count};
+  if (categoryCount >= colors.length) {
+    return {colors, usedCategoryCount: categoryCount};
+  }
 
-  return {colors: colors.slice(0, count), usedCategoryCount: count};
+  return {colors: colors.slice(0, categoryCount), usedCategoryCount: categoryCount};
 }
 
 // ─── Spec walker ─────────────────────────────────────────────────
@@ -343,6 +408,11 @@ function extractScalesFromEncoding(
     if (!scale || typeof scale !== 'object') continue;
 
     const scaleType = inferScaleType(channelDef);
+    // Resolved once and shared: continuous categorical schemes need it
+    // to sample the right number of colors, and discrete schemes / ranges
+    // need it to trim to the used count.
+    const categoryCount =
+      scaleType === 'categorical' ? resolveCategoryCount(spec, channelDef) : null;
     const basePointer = `${pointer}/encoding/${channel}/scale`;
 
     // ── Case 1: scale.range is a literal array of colors ──
@@ -351,7 +421,7 @@ function extractScalesFromEncoding(
         (c): c is string => typeof c === 'string',
       );
       if (colors.length >= 2) {
-        const sliced = maybeSliceCategorical(spec, channelDef, scaleType, colors);
+        const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
         if (sliced.colors.length >= 2) {
           results.push({
             colors: sliced.colors,
@@ -367,9 +437,9 @@ function extractScalesFromEncoding(
 
     // ── Case 2: scale.scheme is a string ──
     if (typeof scale.scheme === 'string') {
-      const colors = resolveNamedScheme(scale.scheme);
+      const colors = resolveNamedScheme(scale.scheme, {scaleType, categoryCount});
       if (colors && colors.length >= 2) {
-        const sliced = maybeSliceCategorical(spec, channelDef, scaleType, colors);
+        const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
         if (sliced.colors.length >= 2) {
           results.push({
             colors: sliced.colors,
@@ -400,9 +470,9 @@ function extractScalesFromEncoding(
           ? (schemeObj.extent as [number, number])
           : undefined;
 
-      const colors = resolveNamedScheme(name, count, extent);
+      const colors = resolveNamedScheme(name, {scaleType, categoryCount, count, extent});
       if (colors && colors.length >= 2) {
-        const sliced = maybeSliceCategorical(spec, channelDef, scaleType, colors);
+        const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
         if (sliced.colors.length >= 2) {
           results.push({
             colors: sliced.colors,

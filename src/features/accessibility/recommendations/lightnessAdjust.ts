@@ -98,7 +98,15 @@ function resolveSchemeColors(
 
 // ─── Safety predicates ──────────────────────────────────────────
 
-function isCategoricalSafe(colors: string[]): boolean {
+/**
+ * Whether every pair in a categorical palette clears the rule's ΔL*
+ * threshold — i.e. `lightnessContrastRule` would NOT flag it.
+ *
+ * Exported so recommendations can verify a candidate palette actually
+ * fixes the issue before offering it (same "re-check against the rule's
+ * own analysis" principle the catalogue scheme swaps use).
+ */
+export function isCategoricalLightnessSafe(colors: string[]): boolean {
   const analysis = analyzeLightness(colors);
   return analysis.problematicPairs.length === 0;
 }
@@ -151,7 +159,7 @@ export function findLightnessSafeSchemes(args: {
 
   const predicate =
     args.scaleType === 'categorical'
-      ? isCategoricalSafe
+      ? isCategoricalLightnessSafe
       : args.scaleType === 'sequential'
         ? isSequentialSafe
         : isDivergingSafe;

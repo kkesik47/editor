@@ -37,6 +37,8 @@
 import type {AccessibilityIssue} from '../types.js';
 import type {Recommendation} from './types.js';
 import {setEncodingChannel, convertMarkToPoint, parentPointer, addTextLabelLayer} from './specMutators.js';
+import {resolveBackground} from '../rules/contrastAnalysis.js';
+import {pickTextColorFor} from './contrastAdjust.js';
 
 // ─── Mark groupings ──────────────────────────────────────────────
 
@@ -255,9 +257,22 @@ export const addTextLabels: Recommendation = {
     // encoding pointer:  /encoding → ''(root) ,  /layer/0/encoding → /layer/0
     const unitPointer = parentPointer(encodingPointerFor(issue));
 
+    // Pick a text colour that contrasts with whatever background the
+    // chart actually has. Without this the text mark inherits Vega-
+    // Lite's default (black), which is invisible on a dark background
+    // — exactly the surprise we want to avoid for an accessibility
+    // recommendation. resolveBackground walks the same fallback chain
+    // contrastRule uses (spec.background → config.background →
+    // config.view.fill → white).
+    const {color: background} = resolveBackground(
+      spec as Record<string, unknown>,
+    );
+    const textColor = pickTextColorFor(background);
+
     return addTextLabelLayer(spec, unitPointer, {
       field: evidence.fieldName,
       type: evidence.fieldType,
+      color: textColor,
     });
   },
 };

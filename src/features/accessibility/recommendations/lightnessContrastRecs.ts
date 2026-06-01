@@ -59,6 +59,7 @@ import {setScheme, setRange, parentPointer} from './specMutators.js';
 import {
   findLightnessSafeSchemes,
   redistributeLightness,
+  isCategoricalLightnessSafe,
   OKABE_ITO_PALETTE,
 } from './lightnessAdjust.js';
 import type {SchemeType} from './schemeCatalog.js';
@@ -176,8 +177,23 @@ export const switchToOkabeItoForLightness: Recommendation = {
     if (!ev) return false;
     if (!isCategoricalIssue(ev)) return false;
     // Don't offer if the data uses more categories than the palette has.
-    return ev.originalColors.length > 0 &&
-      ev.originalColors.length <= OKABE_ITO_PALETTE.length;
+    if (
+      ev.originalColors.length === 0 ||
+      ev.originalColors.length > OKABE_ITO_PALETTE.length
+    ) {
+      return false;
+    }
+    // Only offer Okabe-Ito if it ACTUALLY clears the lightness issue at
+    // this category count. Okabe-Ito is a HUE-separated palette: its
+    // orange (#2) and sky blue (#3) sit at almost the same L*, so any
+    // slice of 3+ colours re-triggers the very warning we're fixing.
+    // And when the author's palette already IS Okabe-Ito's first N,
+    // applying it would be a no-op. Verifying against the rule's own
+    // analysis handles both cases (a passing palette necessarily differs
+    // from the failing one that triggered the issue), and keeps this
+    // consistent with the catalogue scheme swaps below.
+    const sliced = OKABE_ITO_PALETTE.slice(0, ev.originalColors.length);
+    return isCategoricalLightnessSafe(sliced);
   },
 
   apply(issue, spec) {

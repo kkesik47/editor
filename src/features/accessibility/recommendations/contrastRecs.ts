@@ -47,6 +47,7 @@ import {
   setValueAt,
   setConfigProperty,
   setScheme,
+  replaceColorInRange,
   parentPointer,
 } from './specMutators.js';
 import {
@@ -86,6 +87,12 @@ interface ContrastEvidence {
    * palette), per the v2 design decision.
    */
   failingColors: string[] | null;
+  /**
+   * Same failing colours as `failingColors`, paired with their index
+   * in the scale's colour list so a per-colour fix can edit the right
+   * slot in `scale.range`. Scale flavour only.
+   */
+  failingEntries: {color: string; index: number}[] | null;
   /** Scale channel ('color' / 'fill' / 'stroke') for scale issues. */
   channel: string | null;
   /** Existing scheme name on the failing scale, if any. */
@@ -115,14 +122,25 @@ function readContrastEvidence(issue: AccessibilityIssue): ContrastEvidence | nul
   if (typeof threshold !== 'number') return null;
 
   // failingColors on the scale flavour is an array of
-  // {color, ratio, index}; extract just the colour strings.
+  // {color, ratio, index}. Keep the index alongside each colour so a
+  // per-colour fix can edit the right slot in scale.range; the bare
+  // colour strings are derived from it for consumers that only need those.
   const failingRaw = e.failingColors;
-  let failingColors: string[] | null = null;
+  let failingEntries: {color: string; index: number}[] | null = null;
   if (Array.isArray(failingRaw)) {
-    failingColors = failingRaw
-      .map((entry) => (entry as Record<string, unknown>)?.color)
-      .filter((c): c is string => typeof c === 'string');
+    failingEntries = failingRaw
+      .map((entry) => {
+        const r = (entry as Record<string, unknown>) ?? {};
+        return {color: r.color, index: r.index};
+      })
+      .filter(
+        (x): x is {color: string; index: number} =>
+          typeof x.color === 'string' && typeof x.index === 'number',
+      );
   }
+  const failingColors = failingEntries
+    ? failingEntries.map((x) => x.color)
+    : null;
 
   const scaleTypeRaw = e.scaleType;
   const scaleType =
@@ -149,6 +167,7 @@ function readContrastEvidence(issue: AccessibilityIssue): ContrastEvidence | nul
       ? (e.allColors as unknown[]).filter((c): c is string => typeof c === 'string')
       : null,
     failingColors,
+    failingEntries,
     channel: typeof e.channel === 'string' ? e.channel : null,
     schemeName: typeof e.schemeName === 'string' ? e.schemeName : null,
     scaleType,
@@ -341,6 +360,77 @@ export const adjustMarkLightness = buildAdjustForegroundRec({
   applies: isSingleMarkIssue,
 });
 
+// ─── Recommendation: adjust the failing scale colour(s) ─────────
+
+/**
+ * "Adjust the failing colors" — the scale-flavour counterpart to
+ * adjustMarkLightness. Keeps the background and every PASSING colour
+ * untouched, and nudges only the colour(s) that fall below the
+ * threshold until they clear it. Hue is preserved (OKLCH lightness
+ * shift), so each adjusted colour keeps its identity.
+ *
+ * This is the targeted alternative to "Change the background": it
+ * fixes the failing element without a global change, and without
+ * dropping the author's palette the way a scheme swap would.
+ *
+ * Only offered when EVERY failing colour can actually reach the
+ * target ratio, so applying it fully resolves the issue instead of
+ * leaving some colours still failing.
+ */
+export const adjustScaleColors: Recommendation = {
+  id: 'contrast-adjust-scale-colors',
+  label: 'Adjust the failing colors',
+  description:
+    'Keeps the background and every passing colour, and shifts only ' +
+    'the colour(s) below the contrast threshold just enough to clear ' +
+    'it. Hue is preserved — only lightness changes — so each colour ' +
+    "keeps its identity. The most targeted fix for a palette, since " +
+    'the rest of the colours are left exactly as they are.',
+  family: 'adjustment',
+
+  applicableWhen(issue) {
+    const ev = readContrastEvidence(issue);
+    if (!ev || !isScaleIssue(ev)) return false;
+
+    const failing = ev.failingEntries ?? [];
+    if (failing.length === 0) return false;
+
+    // Only offer if every failing colour can actually reach the target;
+    // otherwise applying this would leave the warning partly in place.
+    return failing.every(
+      (f) =>
+        adjustForegroundUntilRatio(f.color, ev.backgroundColor, ev.threshold) !=
+        null,
+    );
+  },
+
+  apply(issue, spec) {
+    const ev = readContrastEvidence(issue);
+    if (!ev) return spec;
+
+    const failing = ev.failingEntries ?? [];
+    // The pointer addresses scale.range (or scale.scheme); its parent
+    // is the scale object — the shape replaceColorInRange expects.
+    const scalePointer = parentPointer(issue.jsonPointer);
+    const fallback = ev.allColors ?? [];
+
+    // Edit each failing slot in turn. allColors is passed as the
+    // fallback so a scheme-based scale is materialised to an explicit
+    // range before the colour is replaced.
+    let next = spec;
+    for (const f of failing) {
+      const adjusted = adjustForegroundUntilRatio(
+        f.color,
+        ev.backgroundColor,
+        ev.threshold,
+      );
+      if (!adjusted) continue; // guarded by applicableWhen
+      next = replaceColorInRange(next, scalePointer, f.index, adjusted, fallback);
+    }
+    return next;
+  },
+};
+
 // ─── Recommendations: pure black/white text ─────────────────────
 
 /**
@@ -513,6 +603,7 @@ export const contrastRecommendations: Recommendation[] = [
   // Foreground-side fixes
   adjustTextLightness,
   adjustMarkLightness,
+  adjustScaleColors,
   useBlackOrWhiteText,
   // Background-side fix (applies to all three issue shapes)
   changeBackground,

@@ -307,7 +307,7 @@ function deepClone<T>(value: T): T {
 export function addTextLabelLayer(
   spec: VegaLiteSpec,
   unitPointer: string,
-  label: {field: string; type: string},
+  label: {field: string; type: string; color?: string},
 ): VegaLiteSpec {
   return updateAt(spec, unitPointer, (node) => {
     const unit = (node as Record<string, unknown>) ?? {};
@@ -324,9 +324,19 @@ export function addTextLabelLayer(
       encoding,
     };
 
-    // Layer 1: a text mark writing the category field.
+    // Layer 1: a text mark writing the category field. We set `color`
+    // explicitly when the caller supplied one — without it, the text
+    // inherits Vega-Lite's default (black), which is invisible on
+    // dark backgrounds. Callers that want the default can omit it.
+    const textMark: Record<string, unknown> = {
+      type: 'text',
+      dy: -8,
+      fontSize: LABEL_FONT_SIZE_PX,
+    };
+    if (label.color) textMark.color = label.color;
+
     const textLayer: Record<string, unknown> = {
-      mark: {type: 'text', dy: -8, fontSize: LABEL_FONT_SIZE_PX},
+      mark: textMark,
       encoding: {
         ...positional,
         text: {field: label.field, type: label.type},

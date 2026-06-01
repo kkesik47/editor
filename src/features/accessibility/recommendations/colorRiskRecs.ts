@@ -53,13 +53,25 @@ type RiskContext =
  * points at, so we can offer matching scheme swaps.
  *
  * Strategy:
- *   1. Walk the issue's pointer looking for `/encoding/<channel>/scale`.
- *   2. Read that channel's `type` field to determine categorical vs
- *      sequential vs diverging.
- *   3. Fall back to scheme name inference if `type` is missing.
+ *   1. Walk the issue's pointer looking for `…/encoding/<channel>/scale`
+ *      ANYWHERE in the path — works for top-level specs (e.g.
+ *      `/encoding/color/scale/range/0`) as well as wrapped ones:
+ *      `/layer/0/encoding/…`, `/concat/2/encoding/…`,
+ *      `/hconcat/1/encoding/…`, `/vconcat/0/encoding/…`,
+ *      `/repeat/encoding/…`, `/spec/encoding/…`.
+ *   2. Read that channel's `type` field at the unit spec to determine
+ *      categorical vs sequential vs diverging.
+ *   3. Fall back to scheme-name inference if `type` is missing.
  *
  * Returns 'unknown' when the pointer doesn't address a scale we can
  * recommend a swap for (e.g. mark.fill, config.range.category).
+ *
+ * Implementation note: we walk into the spec one segment at a time
+ * rather than hardcoding the wrappers we recognise. That way new
+ * container shapes (or schema additions) work automatically — the
+ * only thing this function needs to recognise is the `encoding`
+ * /<channel>/`scale` triple, which is the same regardless of how
+ * deeply it's nested.
  */
 function inferRiskContext(
   issue: AccessibilityIssue,
@@ -68,21 +80,41 @@ function inferRiskContext(
   const pointer = issue.jsonPointer;
   if (!pointer) return {kind: 'unknown'};
 
-  // Pointer examples we want to handle:
-  //   /encoding/color/scale/range/0   (categorical range entry)
-  //   /encoding/color/scale/scheme    (scheme reference)
   const segments = pointer.split('/').filter(Boolean);
-  const scaleIdx = segments.indexOf('scale');
-  if (scaleIdx === -1) return {kind: 'unknown'};
 
-  // We need an /encoding/<channel>/scale prefix to look at the
-  // channel's field type. Reject /config/range/... for now.
-  if (segments[0] !== 'encoding' || scaleIdx < 2) return {kind: 'unknown'};
+  // Find the LAST occurrence of `encoding` followed by `<channel>/scale`.
+  // Last wins for the (rare) case of an inner spec inheriting from
+  // an outer one — we want the deepest channel that actually owns
+  // the failing colour.
+  let encIdx = -1;
+  for (let i = segments.length - 3; i >= 0; i--) {
+    if (segments[i] === 'encoding' && segments[i + 2] === 'scale') {
+      encIdx = i;
+      break;
+    }
+  }
+  if (encIdx === -1) return {kind: 'unknown'};
 
-  const channel = segments[1];
-  const scalePointer = '/' + segments.slice(0, scaleIdx + 1).join('/');
+  const channel = segments[encIdx + 1];
+  const scalePointer = '/' + segments.slice(0, encIdx + 3).join('/');
 
-  const channelDef = (spec as any)?.encoding?.[channel];
+  // Resolve the unit that owns this encoding by walking the segments
+  // ABOVE `encoding` into the spec. This handles arbitrary wrapper
+  // nesting (layer / concat / hconcat / vconcat / repeat / spec / facet)
+  // without enumerating each container type.
+  let unit: unknown = spec;
+  for (let i = 0; i < encIdx; i++) {
+    if (unit == null || typeof unit !== 'object') {
+      unit = null;
+      break;
+    }
+    const key = segments[i];
+    // Arrays (e.g. `layer`, `concat`, `hconcat`, `vconcat`) take a
+    // numeric segment next; both lookups work with bracket access.
+    unit = (unit as Record<string, unknown>)[key];
+  }
+
+  const channelDef = (unit as Record<string, any>)?.encoding?.[channel];
   const fieldType = channelDef?.type;
 
   // Diverging signals on the scale block (mirror resolveScaleColors.ts).
