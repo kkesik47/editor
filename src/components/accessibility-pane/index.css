@@ -299,3 +299,27 @@
   font-weight: 450;
   color: #333;
 }
+
+/* ── Heatmap hover ↔ card coordination ─────────────────────────── */
+
+/* Soft wash on cards whose matching blob is being hovered.
+   Mirrors the editor's line-highlight colours so the three
+   surfaces (chart, editor, pane) feel like one synchronised view. */
+.accessibility-pane .a11y-issue.is-hovered.severity-warning {
+  background-color: rgba(255, 193, 7, 0.10);
+}
+.accessibility-pane .a11y-issue.is-hovered.severity-info {
+  background-color: rgba(28, 138, 228, 0.08);
+}
+
+/* One-shot flash when a heatmap blob is clicked: a ring that fades
+   out around the focused card. Distinct from the hover wash so
+   "you're being shown this card right now" reads differently from
+   "you happen to be hovering its blob". */
+.accessibility-pane .a11y-issue.is-focused {
+  animation: a11y-focus-flash 1.2s ease-out;
+}
+@keyframes a11y-focus-flash {
+  0%   { box-shadow: 0 0 0 2px rgba(28, 138, 228, 0.55); }
+  100% { box-shadow: 0 0 0 2px rgba(28, 138, 228, 0); }
+}

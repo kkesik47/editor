@@ -23,36 +23,58 @@ interface AccessibilityPaneRendererProps {
 // ─── Helpers ─────────────────────────────────────────────────────
 
 /**
- * Partition issues by severity. Order within each group is preserved
- * from the input — `evaluateVegaLiteAccessibility` already sorts by
- * rule priority, so we want to keep that ordering inside each group.
+ * An issue paired with its index in the original, unpartitioned
+ * `accessibilityIssues` array.
+ *
+ * Why we carry the original index: the heatmap builds each issue's
+ * key from its position in the FLAT issues array, but this pane
+ * splits issues into warnings/suggestions sections. If we keyed off
+ * the per-section index, the same issue would get a different key on
+ * each surface and the heatmap ↔ pane matching (hover highlight and
+ * click-to-scroll) would silently fail. Threading the original index
+ * through keeps both surfaces computing the identical key.
+ */
+interface IndexedIssue {
+  issue: AccessibilityIssue;
+  originalIndex: number;
+}
+
+/**
+ * Partition issues by severity, preserving each issue's original
+ * index. Order within each group is preserved from the input —
+ * `evaluateVegaLiteAccessibility` already sorts by rule priority, so
+ * we want to keep that ordering inside each group.
  */
 function partitionBySeverity(issues: AccessibilityIssue[]): {
-  warnings: AccessibilityIssue[];
-  suggestions: AccessibilityIssue[];
+  warnings: IndexedIssue[];
+  suggestions: IndexedIssue[];
 } {
-  const warnings: AccessibilityIssue[] = [];
-  const suggestions: AccessibilityIssue[] = [];
+  const warnings: IndexedIssue[] = [];
+  const suggestions: IndexedIssue[] = [];
 
-  for (const issue of issues) {
+  issues.forEach((issue, originalIndex) => {
     if (issue.severity === 'warning' || issue.severity === 'error') {
-      warnings.push(issue);
+      warnings.push({issue, originalIndex});
     } else {
       // 'info' issues are framed as suggestions in the UI.
-      suggestions.push(issue);
+      suggestions.push({issue, originalIndex});
     }
-  }
+  });
 
   return {warnings, suggestions};
 }
 
 /**
- * Generate a stable React key per issue.
+ * Generate a stable key per issue.
  *
  * The combination of `ruleId` + `jsonPointer` is unique in practice:
  * each rule emits at most one issue per JSON pointer. Appending the
- * array index guards against any future duplicates without affecting
+ * index guards against any future duplicates without affecting
  * scroll-position stability in the common case.
+ *
+ * NB: this MUST stay identical to the heatmap's `issueKey`
+ * (src/features/accessibility/heatmap/issueKey.ts) — the two are
+ * matched against each other to coordinate hover and click-jump.
  */
 function issueKey(issue: AccessibilityIssue, index: number): string {
   return `${issue.ruleId}|${issue.jsonPointer}|${index}`;
@@ -158,18 +180,37 @@ function IssueRecommendations({
 }
 
 /**
- * One issue card. Shows JSON pointer + rule ID at the top, the message
- * with inline APA citations, the suggestion, the actionable
- * recommendations (if any), any applicable preview SVGs, and a
- * collapsible "References" section listing full citations with
- * clickable DOI links.
+ * One issue card.
+ *
+ * Shows JSON pointer + rule ID at the top, the message with inline
+ * APA citations, any applicable preview SVGs, the actionable
+ * recommendations (if any), and a collapsible "References" section
+ * listing full citations with clickable DOI links.
+ *
+ * Heatmap coordination:
+ *   - `isHovered` paints a soft severity-coloured wash while the
+ *     matching heatmap blob is hovered.
+ *   - `isFocused` plays a one-shot flash when the matching blob is
+ *     clicked (paired with a scroll-into-view in the parent).
+ *   - `cardRef` registers this card's DOM node with the parent so it
+ *     can be scrolled into view by key.
+ *   - `data-issue-key` is mainly a debugging aid (lets you find a
+ *     card in the DOM by key), harmless to keep.
  */
 function IssueCard({
   issue,
+  cardKey,
+  isHovered,
+  isFocused,
+  cardRef,
   recommendations,
   onApplyRecommendation,
 }: {
   issue: AccessibilityIssue;
+  cardKey: string;
+  isHovered: boolean;
+  isFocused: boolean;
+  cardRef: (el: HTMLLIElement | null) => void;
   recommendations: Recommendation[];
   onApplyRecommendation: (rec: Recommendation, issue: AccessibilityIssue) => void;
 }) {
@@ -188,8 +229,12 @@ function IssueCard({
     (p) => p.src.length > 0,
   );
 
+  const classes = ['a11y-issue', severityClass];
+  if (isHovered) classes.push('is-hovered');
+  if (isFocused) classes.push('is-focused');
+
   return (
-    <li className={`a11y-issue ${severityClass}`}>
+    <li ref={cardRef} data-issue-key={cardKey} className={classes.join(' ')}>
       <div className="a11y-issue-header">
         <span className="a11y-issue-pointer">{issue.jsonPointer || '/'}</span>
         <span className="a11y-issue-rule-id">{issue.ruleId}</span>
@@ -202,17 +247,11 @@ function IssueCard({
           ))}
         </div>
       )}
-      {/* {issue.suggestion && (
-        <p className="a11y-issue-suggestion">
-          <strong>Suggestion:</strong> {issue.suggestion}
-        </p>
-      )} */}
       <IssueRecommendations
         issue={issue}
         recommendations={recommendations}
         onApply={onApplyRecommendation}
       />
-      
       <IssueReferences references={references} />
     </li>
   );
@@ -309,16 +348,61 @@ const AccessibilityPaneRenderer: React.FC<AccessibilityPaneRendererProps> = ({is
     [currentSpec, setState],
   );
 
+  // ── Heatmap ↔ pane coordination ───────────────────────────────
+  //
+  // Map from card key → DOM node, populated via callback refs on each
+  // IssueCard. Lets us scroll a card into view by key without
+  // re-rendering the list. A plain ref-held Map is enough here: it's
+  // mutated in callback refs (not during render) and only read inside
+  // an effect, so it never needs to trigger a re-render itself.
+  const cardRefs = React.useRef(new Map<string, HTMLLIElement>());
+
+  // Hover keys paint a soft wash on matching cards (driven by the
+  // heatmap mouse-over). Focus key drives a one-shot scroll + flash
+  // (driven by clicking a heatmap blob). Both are read off context.
+  const hoveredIssueKeys = state.hoveredIssueKeys ?? [];
+  const focusedIssueKey = state.focusedIssueKey ?? null;
+
+  // Scroll the focused card into view, then clear the focus token so a
+  // repeat click on the same blob fires the effect again (without the
+  // clear, state wouldn't change on a second identical click and the
+  // effect would not re-run).
+  //
+  // `block: 'nearest'` means we only scroll when the card is actually
+  // off-screen — no jolt if it's already visible. The requestAnimation-
+  // Frame defers one frame so the pane (which may have just been
+  // revealed via `debugPane: true` on the same click) has laid out
+  // before we measure. The 1.2s timeout matches the flash animation so
+  // the highlight plays fully before the class is removed.
+  React.useEffect(() => {
+    if (!focusedIssueKey) return undefined;
+
+    const raf = requestAnimationFrame(() => {
+      const el = cardRefs.current.get(focusedIssueKey);
+      if (el) el.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    });
+
+    const timer = setTimeout(() => {
+      setState((s) => (s.focusedIssueKey === focusedIssueKey ? {...s, focusedIssueKey: null} : s));
+    }, 1200);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [focusedIssueKey, setState]);
+
   // ── Pre-compute recommendations per issue ─────────────────────
   //
   // Done at this level so each IssueCard receives its list as a
-  // prop instead of re-running the lookup on every render.
+  // prop instead of re-running the lookup on every render. Keyed by
+  // the issue's ORIGINAL index so the keys match everywhere.
   const recommendationsByKey = React.useMemo(() => {
     const map = new Map<string, Recommendation[]>();
     if (!currentSpec) return map;
 
-    [...warnings, ...suggestions].forEach((issue, i) => {
-      const key = issueKey(issue, i);
+    [...warnings, ...suggestions].forEach(({issue, originalIndex}) => {
+      const key = issueKey(issue, originalIndex);
       const recs = getApplicableRecommendations(issue, currentSpec);
       map.set(key, recs);
     });
@@ -334,43 +418,39 @@ const AccessibilityPaneRenderer: React.FC<AccessibilityPaneRendererProps> = ({is
     );
   }
 
+  // Build a card from an indexed issue. Shared by both sections so the
+  // ref/hover/focus wiring stays identical and can't drift.
+  const renderCard = ({issue, originalIndex}: IndexedIssue) => {
+    const key = issueKey(issue, originalIndex);
+    return (
+      <IssueCard
+        key={key}
+        cardKey={key}
+        issue={issue}
+        isHovered={hoveredIssueKeys.includes(key)}
+        isFocused={focusedIssueKey === key}
+        cardRef={(el) => {
+          if (el) cardRefs.current.set(key, el);
+          else cardRefs.current.delete(key);
+        }}
+        recommendations={recommendationsByKey.get(key) ?? []}
+        onApplyRecommendation={applyRecommendation}
+      />
+    );
+  };
+
   return (
     <div className="accessibility-pane">
       {warnings.length > 0 && (
         <section className="a11y-section">
           <SectionHeaderWarning title="Warnings" count={warnings.length} />
-          <ul className="a11y-issue-list">
-            {warnings.map((issue, i) => {
-              const key = issueKey(issue, i);
-              return (
-                <IssueCard
-                  key={key}
-                  issue={issue}
-                  recommendations={recommendationsByKey.get(key) ?? []}
-                  onApplyRecommendation={applyRecommendation}
-                />
-              );
-            })}
-          </ul>
+          <ul className="a11y-issue-list">{warnings.map(renderCard)}</ul>
         </section>
       )}
       {suggestions.length > 0 && (
         <section className="a11y-section">
           <SectionHeaderSuggestion title="Suggestions" count={suggestions.length} />
-          <ul className="a11y-issue-list">
-            {suggestions.map((issue, i) => {
-              // Offset the index so warning/suggestion keys never collide.
-              const key = issueKey(issue, warnings.length + i);
-              return (
-                <IssueCard
-                  key={key}
-                  issue={issue}
-                  recommendations={recommendationsByKey.get(key) ?? []}
-                  onApplyRecommendation={applyRecommendation}
-                />
-              );
-            })}
-          </ul>
+          <ul className="a11y-issue-list">{suggestions.map(renderCard)}</ul>
         </section>
       )}
     </div>

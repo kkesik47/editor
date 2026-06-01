@@ -34,6 +34,7 @@ import type {SceneItem} from '../../features/accessibility/heatmap/boundingBox.j
 import {resolveIssueRegions, type IssueRegion} from '../../features/accessibility/heatmap/resolvers.js';
 import {clusterRegions, orderByPrecedence} from '../../features/accessibility/heatmap/clustering.js';
 import './index.css';
+import {NAVBAR} from '../../constants/consts.js';
 
 interface OverlayGeometry {
   /** Displayed position/size of the graphic, relative to the .chart box. */
@@ -236,6 +237,13 @@ export default function AccessibilityHeatmap() {
               opacity={blobOpacity(cluster.count)}
               onMouseEnter={() => setHover(cluster.keys)}
               onMouseLeave={() => setHover([])}
+              onClick={() => setState((s) => ({
+                ...s,
+                navItem: NAVBAR.Accessibility,
+                logs: false,
+                debugPane: true,
+                focusedIssueKey: cluster.keys[0],
+              }))}
             />
           );
         })}
