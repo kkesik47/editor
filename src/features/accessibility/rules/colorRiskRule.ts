@@ -347,23 +347,3 @@ export const colorRiskRule: AccessibilityRule = {
   references: [BIRCH_2012, SHARMA_CVD_2023, CRAMERI_2020, WCAG_USE_OF_COLOR],
   evaluate: (spec: Record<string, any>): AccessibilityIssue[] => evaluateColorCombinationRisk(spec, rules),
 };
-
-// Backward-compatible alias while transitioning from pair-specific rules.
-export const redGreenRiskRule = colorRiskRule;
-
-export const colorRiskRuleExampleIssue: AccessibilityIssue = {
-  ruleId: 'vl-a11y-color-risk-rules:red-green',
-  severity: 'warning',
-  message:
-    'The visualization combines red and green families, which can be difficult to distinguish for users with common red-green color vision deficiencies.',
-  suggestion: 'Use a colorblind-safe palette (e.g., blue/orange) or add shape, pattern, labels, or direct annotations.',
-  jsonPointer: '/encoding/color/scale/range/0',
-  evidence: {
-    ruleLabel: 'Red/Green pairing',
-    families: ['red', 'green'],
-    cvdTypes: ['protanopia', 'deuteranopia'],
-    matchedColors: [],
-  },
-};
-
-export const redGreenRiskRuleExampleIssue = colorRiskRuleExampleIssue;
