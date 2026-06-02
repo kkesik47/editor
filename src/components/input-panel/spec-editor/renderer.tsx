@@ -159,7 +159,7 @@ function toIssueDecorations(
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
-    const header = isAAA ? `**Accessibility suggestion**` : `**Accessibility** (${issue.severity})`;
+    const header = isAAA ? `**Accessibility** (suggestion)` : `**Accessibility** (${issue.severity})`;
 
     // Brief tooltip: header + message-with-italic-citations + footer.
     // Full details (suggestion, previews, clickable references) live
