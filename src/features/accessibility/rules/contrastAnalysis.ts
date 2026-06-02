@@ -332,25 +332,29 @@ function resolveTextColor(
 // ─── Chart title ─────────────────────────────────────────────────
 
 /**
- * Check contrast of the chart title text.
- * Skipped when the spec has no title property.
+ * Check contrast of a view's title text.
+ * Skipped when the view has no title property.
+ * Pointers are prefixed with `pointer` so layered/concat titles land
+ * at the right place in the source.
  */
 function checkTitleContrast(
-  spec: Record<string, any>,
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
   bg: string,
+  pointer: string,
 ): TextContrastEntry | null {
-  if (spec?.title == null) return null;
+  if (node?.title == null) return null;
 
-  return resolveTextColor(spec, bg, {
+  return resolveTextColor(rootSpec, bg, {
     label: 'Chart title',
     configKey: 'title.color',
     inlineValue:
-      typeof spec.title === 'object' && !Array.isArray(spec.title)
-        ? spec.title.color
+      typeof node.title === 'object' && !Array.isArray(node.title)
+        ? node.title.color
         : undefined,
-    inlinePointer: '/title/color',
+    inlinePointer: `${pointer}/title/color`,
     configPath: ['config', 'title', 'color'],
-    defaultPointer: '/title',
+    defaultPointer: `${pointer}/title`,
   });
 }
 
@@ -375,35 +379,37 @@ function axisDefaultPointer(
 }
 
 /**
- * Check label and title text contrast for one axis channel.
+ * Check label and title text contrast for one axis channel of a view.
  */
 function checkAxisContrast(
-  spec: Record<string, any>,
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
   bg: string,
   channel: string,
+  pointer: string,
 ): TextContrastEntry[] {
-  const channelDef = spec?.encoding?.[channel];
+  const channelDef = node?.encoding?.[channel];
   if (!channelDef || typeof channelDef !== 'object') return [];
 
   const axisLabel = AXIS_LABELS_MAP[channel] ?? channel;
-  const defaultPtr = axisDefaultPointer(spec, channel);
+  const defaultPtr = hasObjectAtPath(node, ['encoding', channel, 'axis'])
+    ? `${pointer}/encoding/${channel}/axis`
+    : `${pointer}/encoding/${channel}`;
 
   return [
-    // Label color
-    resolveTextColor(spec, bg, {
+    resolveTextColor(rootSpec, bg, {
       label: `${axisLabel} labels`,
       configKey: 'axis.labelColor',
       inlineValue: channelDef?.axis?.labelColor,
-      inlinePointer: `/encoding/${channel}/axis/labelColor`,
+      inlinePointer: `${pointer}/encoding/${channel}/axis/labelColor`,
       configPath: ['config', 'axis', 'labelColor'],
       defaultPointer: defaultPtr,
     }),
-    // Title color
-    resolveTextColor(spec, bg, {
+    resolveTextColor(rootSpec, bg, {
       label: `${axisLabel} title`,
       configKey: 'axis.titleColor',
       inlineValue: channelDef?.axis?.titleColor,
-      inlinePointer: `/encoding/${channel}/axis/titleColor`,
+      inlinePointer: `${pointer}/encoding/${channel}/axis/titleColor`,
       configPath: ['config', 'axis', 'titleColor'],
       defaultPointer: defaultPtr,
     }),
@@ -433,35 +439,37 @@ function legendDefaultPointer(
 }
 
 /**
- * Check label and title text contrast for one legend channel.
+ * Check label and title text contrast for one legend channel of a view.
  */
 function checkLegendContrast(
-  spec: Record<string, any>,
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
   bg: string,
   channel: string,
+  pointer: string,
 ): TextContrastEntry[] {
-  const channelDef = spec?.encoding?.[channel];
+  const channelDef = node?.encoding?.[channel];
   if (!channelDef || typeof channelDef !== 'object') return [];
 
   const legendLabel = LEGEND_LABELS_MAP[channel] ?? channel;
-  const defaultPtr = legendDefaultPointer(spec, channel);
+  const defaultPtr = hasObjectAtPath(node, ['encoding', channel, 'legend'])
+    ? `${pointer}/encoding/${channel}/legend`
+    : `${pointer}/encoding/${channel}`;
 
   return [
-    // Label color
-    resolveTextColor(spec, bg, {
+    resolveTextColor(rootSpec, bg, {
       label: `${legendLabel} labels`,
       configKey: 'legend.labelColor',
       inlineValue: channelDef?.legend?.labelColor,
-      inlinePointer: `/encoding/${channel}/legend/labelColor`,
+      inlinePointer: `${pointer}/encoding/${channel}/legend/labelColor`,
       configPath: ['config', 'legend', 'labelColor'],
       defaultPointer: defaultPtr,
     }),
-    // Title color
-    resolveTextColor(spec, bg, {
+    resolveTextColor(rootSpec, bg, {
       label: `${legendLabel} title`,
       configKey: 'legend.titleColor',
       inlineValue: channelDef?.legend?.titleColor,
-      inlinePointer: `/encoding/${channel}/legend/titleColor`,
+      inlinePointer: `${pointer}/encoding/${channel}/legend/titleColor`,
       configPath: ['config', 'legend', 'titleColor'],
       defaultPointer: defaultPtr,
     }),
@@ -608,6 +616,62 @@ function checkScaleContrast(
   return results;
 }
 
+/**
+ * Walk the spec tree and collect text-contrast entries for every view
+ * (title + per-axis + per-legend). Mirrors collectMarkColors so the
+ * text and mark halves of the contrast analysis behave the same way.
+ *
+ * Without this walk, wrapping a chart in a `layer` — e.g. when the
+ * colour-only fix adds a text-label layer — hides every text element
+ * from this rule. The same argument is made by fontSizeAnalysis (see
+ * its file header).
+ *
+ * Config is global, so it is always resolved from the ROOT spec;
+ * inline values come from each view node.
+ *
+ * Known limitation: sibling layers SHARE one axis/legend in Vega-Lite,
+ * but this walker doesn't de-duplicate them. If a future spec has
+ * multiple sibling layers all inheriting the same default/config text
+ * colour, the same rendered axis will be flagged once per layer. The
+ * coordSystemOf + dedupeByElement pattern in fontSizeAnalysis is the
+ * fix to lift here if that case shows up.
+ */
+function collectTextEntries(
+  rootSpec: Record<string, any>,
+  node: unknown,
+  pointer: string,
+  bg: string,
+  entries: TextContrastEntry[],
+): void {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+  const obj = node as Record<string, any>;
+
+  // Title at this view level
+  const titleEntry = checkTitleContrast(obj, rootSpec, bg, pointer);
+  if (titleEntry) entries.push(titleEntry);
+
+  // Per-axis and per-legend (skip themselves if no encoding[channel])
+  for (const channel of AXIS_CHANNELS) {
+    entries.push(...checkAxisContrast(obj, rootSpec, bg, channel, pointer));
+  }
+  for (const channel of LEGEND_CHANNELS) {
+    entries.push(...checkLegendContrast(obj, rootSpec, bg, channel, pointer));
+  }
+
+  // Recurse into compositions
+  for (const key of ['layer', 'hconcat', 'vconcat', 'concat']) {
+    const children = obj[key];
+    if (Array.isArray(children)) {
+      children.forEach((child, i) => {
+        collectTextEntries(rootSpec, child, `${pointer}/${key}/${i}`, bg, entries);
+      });
+    }
+  }
+  if (obj.spec) {
+    collectTextEntries(rootSpec, obj.spec, `${pointer}/spec`, bg, entries);
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────
 
 /**
@@ -627,27 +691,16 @@ export function analyzeContrast(
   spec: Record<string, any>,
 ): ContrastAnalysisResult {
   const bg = resolveBackground(spec);
+
+  // Text colours (walks compositions, matches collectMarkColors)
   const textEntries: TextContrastEntry[] = [];
+  collectTextEntries(spec, spec, '', bg.color, textEntries);
 
-  // Chart title
-  const titleEntry = checkTitleContrast(spec, bg.color);
-  if (titleEntry) textEntries.push(titleEntry);
-
-  // Per-axis checks
-  for (const channel of AXIS_CHANNELS) {
-    textEntries.push(...checkAxisContrast(spec, bg.color, channel));
-  }
-
-  // Per-legend checks
-  for (const channel of LEGEND_CHANNELS) {
-    textEntries.push(...checkLegendContrast(spec, bg.color, channel));
-  }
-
-  // Mark colors (walks compositions)
+  // Mark colours (walks compositions)
   const markEntries: MarkContrastEntry[] = [];
   collectMarkColors(spec, '', bg.color, markEntries);
 
-  // Scale colors (categorical only)
+  // Scale colours (categorical only)
   const scaleResults = checkScaleContrast(spec, bg.color);
 
   return {
