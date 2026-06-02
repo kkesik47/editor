@@ -125,10 +125,10 @@ export function evaluateVegaLiteAccessibility(
     'vl-a11y-colorblind-safety': 0,
     'vl-a11y-color-risk-rules': 1,
     'vl-a11y-lightness-contrast': 2,
-    'vl-a11y-font-size': 3,
+    'vl-a11y-perceptual-uniformity': 3,
     'vl-a11y-contrast': 4,
     'vl-a11y-color-only': 5,
-    'vl-a11y-perceptual-uniformity': 6,
+    'vl-a11y-font-size': 6,
   };
 
   return enriched.sort((a, b) => {
