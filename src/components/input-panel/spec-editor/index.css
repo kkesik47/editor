@@ -60,7 +60,7 @@
    matching source line(s) get a soft wash plus a stronger inline mark
    on the exact value. Distinct from the issue underline decorations so
    the two never visually fight. */
-/* Warning hover (existing, just rename for clarity) */
+/* Warning hover - yellow highlight */
 .a11yHoverLineHighlight {
   background-color: rgba(255, 193, 7, 0.18);
 }

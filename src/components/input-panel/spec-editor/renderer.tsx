@@ -257,7 +257,7 @@ function toIssueMarkers(
       endColumn: 1,
       severity: markerSeverity,
       source: issue.ruleId,
-      message: `${issue.message}\nSuggestion: ${issue.suggestion}`,
+      message: `${issue.message}`,
     });
   }
   return markers;

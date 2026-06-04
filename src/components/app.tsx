@@ -217,7 +217,7 @@ const App: React.FC<Props> = (props) => {
         const accessibilityIssues = evaluateVegaLiteAccessibility(vegaLiteSpec as Record<string, any>);
         for (const issue of accessibilityIssues) {
           currLogger.warn(
-            `[A11Y:${issue.ruleId}] ${issue.message} (at ${issue.jsonPointer}) Suggestion: ${issue.suggestion}`,
+            `[A11Y:${issue.ruleId}] ${issue.message} (at ${issue.jsonPointer})`,
           );
         }
 

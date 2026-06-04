@@ -35,17 +35,6 @@ export interface AccessibilityIssue {
   message: string;
   evidence: Record<string, unknown>;
   jsonPointer: string;
-  suggestion: string;
-
-  /**
-   * Optional per-issue references. Use when an issue cites a more
-   * specific source than the rule as a whole — e.g. a text-AA
-   * contrast failure cites WCAG SC 1.4.3 specifically, while the
-   * rule itself lists all three contrast criteria (1.4.3, 1.4.6, 1.4.11).
-   *
-   * When omitted, callers should fall back to the parent rule's
-   * `references` array.
-   */
   references?: Reference[];
 
   /**
@@ -53,6 +42,10 @@ export interface AccessibilityIssue {
    * 'underline' (the historical default). See type docs above.
    */
   editorVisibility?: AccessibilityIssueEditorVisibility;
+
+  /*Before we had recommendation engine, each AccessibilityIssue had a hardcoded
+  message suggestion (e.g. switch to viridis)*/
+  //suggestion: string;   
 }
 
 export interface AccessibilityRule {
