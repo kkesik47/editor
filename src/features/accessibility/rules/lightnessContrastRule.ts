@@ -56,7 +56,7 @@ function buildCategoricalIssue(
 
   return {
     ruleId: 'vl-a11y-lightness-contrast:categorical',
-    severity: 'warning',
+    severity: 'info',
 
     message:
       `${pairCount} color ${pairWord} in the '${scale.channel}' scale ` +
@@ -102,7 +102,7 @@ function buildSequentialRangeIssue(
 ): AccessibilityIssue {
   return {
     ruleId: 'vl-a11y-lightness-contrast:sequential-range',
-    severity: 'warning',
+    severity: 'info',
 
     message:
       `The '${scale.channel}' scale has a narrow lightness range ` +
@@ -145,7 +145,7 @@ function buildMonotonicityIssue(
 
   return {
     ruleId: 'vl-a11y-lightness-contrast:non-monotonic',
-    severity: 'warning',
+    severity: 'info',
 
     message:
       `The '${scale.channel}' sequential scale${schemeNote} has ` +
@@ -211,7 +211,7 @@ function buildDivergingRangeIssue(
 
   return {
     ruleId: 'vl-a11y-lightness-contrast:diverging-range',
-    severity: 'warning',
+    severity: 'info',
 
     message:
       `The '${scale.channel}' diverging scale${schemeNote} has too ` +

@@ -44,8 +44,9 @@ export interface AccessibilityIssue {
   editorVisibility?: AccessibilityIssueEditorVisibility;
 
   /*Before we had recommendation engine, each AccessibilityIssue had a hardcoded
-  message suggestion (e.g. switch to viridis)*/
-  //suggestion: string;   
+  message suggestion (e.g. switch to viridis)
+  Can be removed, but has to be removed from each rule as well to avoid errors*/
+  suggestion: string;   
 }
 
 export interface AccessibilityRule {

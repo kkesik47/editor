@@ -265,7 +265,7 @@ function buildSequentialWarning(
 ): AccessibilityIssue {
   return {
     ruleId: 'vl-a11y-perceptual-uniformity:high-cv',
-    severity: 'warning',
+    severity: 'info',
     message:
       `The '${scale.channel}' sequential scale${schemeNoteFor(scale)} is ` +
       `not perceptually uniform. When moving between equally spaced ` +
@@ -315,7 +315,7 @@ function buildSequentialJump(
 ): AccessibilityIssue {
   return {
     ruleId: 'vl-a11y-perceptual-uniformity:localized-jump',
-    severity: 'warning',
+    severity: 'info',
     message:
       `The '${scale.channel}' sequential scale${schemeNoteFor(scale)} has ` +
       `a sudden color jump — at one point in the scale, the color ` +
@@ -343,7 +343,7 @@ function buildDivergingWarning(
   const sideText = describeSide(side);
   return {
     ruleId: 'vl-a11y-perceptual-uniformity:high-cv',
-    severity: 'warning',
+    severity: 'info',
     message:
       `The '${scale.channel}' diverging scale${schemeNoteFor(scale)} is ` +
       `not perceptually uniform within its ${sideText}. When moving ` +
@@ -399,7 +399,7 @@ function buildDivergingJump(
   const sideText = describeSide(side);
   return {
     ruleId: 'vl-a11y-perceptual-uniformity:localized-jump',
-    severity: 'warning',
+    severity: 'info',
     message:
       `The '${scale.channel}' diverging scale${schemeNoteFor(scale)} has ` +
       `a sudden color jump within its ${sideText} — at one point, the ` +
