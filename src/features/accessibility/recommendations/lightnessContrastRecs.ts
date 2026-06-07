@@ -3,46 +3,29 @@
  *
  * Recommendations for issues from `lightnessContrastRule`.
  *
- * The rule emits five sub-IDs across three scale shapes:
+ * The rule emits four sub-IDs across two scale shapes:
  *
- *   :categorical              pairs too close in L* (merge in grayscale)
  *   :sequential-range         total L* range below threshold
  *   :non-monotonic            sequential lightness reverses direction
  *   :diverging-range          a diverging half spans too little L*
  *   :diverging-non-monotonic  a diverging half's lightness wobbles
  *
- * One registry entry `'vl-a11y-lightness-contrast'` covers all five
+ * One registry entry `'vl-a11y-lightness-contrast'` covers all four
  * via prefix matching.
  *
- * ─── Trade-off space per scale shape ─────────────────────────────
+ * Categorical scales are not covered: the lightness rule does not
+ * apply to them (qualitative palettes trade lightness uniformity for
+ * hue diversity by design — Brewer 2003; Wong 2011), so no
+ * categorical issues are emitted and no recommendations are needed.
  *
- *   Sequential / diverging:
- *     The only sensible machine-applicable fix is a palette swap.
- *     "Nudge a narrow range wider" or "remove a lightness reversal"
- *     can't be expressed as a targeted edit; they're palette
- *     redesigns. So we offer named replacements whose lightness
- *     profile is GUARANTEED good — each candidate is verified using
- *     the rule's own analysis functions (see lightnessAdjust.ts).
+ * ─── Trade-off space ─────────────────────────────────────────────
  *
- *   Categorical:
- *     Most categorical palettes vary HUE rather than lightness, so
- *     scheme swaps almost never pass the per-pair ΔL* check. To
- *     avoid the "warning with no recommendations" UX, two genuine
- *     trade-offs cover this case:
- *
- *       Redistribute lightness (adjustment)
- *         Keeps the author's actual colours but spreads their L*
- *         values across a wide range. Same hues, same designer
- *         intent, legibly different in grayscale.
- *
- *       Switch to Okabe-Ito palette (replacement)
- *         Hand-picked palette with both CVD safety AND good L*
- *         separation. Drops the original colours entirely, but
- *         guarantees a strong default for accessibility.
- *
- *     Catalogue scheme swaps are also offered when any genuinely
- *     pass the safety check (rare at typical category counts), via
- *     the same per-rec verification mechanism the other shapes use.
+ * The only sensible machine-applicable fix is a palette swap.
+ * "Nudge a narrow range wider" or "remove a lightness reversal"
+ * can't be expressed as a targeted edit; they're palette
+ * redesigns. So we offer named replacements whose lightness
+ * profile is GUARANTEED good — each candidate is verified using
+ * the rule's own analysis functions (see lightnessAdjust.ts).
  *
  * ─── Why "guaranteed safe" matters here ──────────────────────────
  *
@@ -55,27 +38,15 @@
 
 import type {AccessibilityIssue} from '../types.js';
 import type {Recommendation} from './types.js';
-import {setScheme, setRange, parentPointer} from './specMutators.js';
-import {
-  findLightnessSafeSchemes,
-  redistributeLightness,
-  isCategoricalLightnessSafe,
-  OKABE_ITO_PALETTE,
-} from './lightnessAdjust.js';
-import type {SchemeType} from './schemeCatalog.js';
+import {setScheme, parentPointer} from './specMutators.js';
+import {findLightnessSafeSchemes} from './lightnessAdjust.js';
 
 // ─── Evidence reader ─────────────────────────────────────────────
 
 interface LightnessEvidence {
-  scaleType: SchemeType;
+  scaleType: 'sequential' | 'diverging';
   schemeName: string | null;
-  /**
-   * The colours actually rendered by the chart, threaded through by
-   * the rule. For categorical issues these are the literal palette
-   * the author chose (or the sliced scheme colours). For sequential
-   * / diverging issues these are the sampled gradient. Only the
-   * categorical-side recs (redistribute / Okabe-Ito) use them.
-   */
+  /** The sampled gradient colours threaded through by the rule. */
   originalColors: string[];
 }
 
@@ -84,11 +55,7 @@ function readLightnessEvidence(issue: AccessibilityIssue): LightnessEvidence | n
   if (!e || typeof e !== 'object') return null;
 
   const scaleType = e.scaleType;
-  if (
-    scaleType !== 'categorical' &&
-    scaleType !== 'sequential' &&
-    scaleType !== 'diverging'
-  ) {
+  if (scaleType !== 'sequential' && scaleType !== 'diverging') {
     return null;
   }
 
@@ -101,120 +68,18 @@ function readLightnessEvidence(issue: AccessibilityIssue): LightnessEvidence | n
   return {scaleType, schemeName, originalColors};
 }
 
-function isCategoricalIssue(ev: LightnessEvidence): boolean {
-  return ev.scaleType === 'categorical';
-}
-
-// ─── Categorical: redistribute lightness ────────────────────────
-
-/**
- * "Redistribute lightness in the current palette".
- *
- * The targeted-edit answer to the categorical case: take the
- * author's actual colours, keep each one's hue and chroma, and
- * spread their CIELAB L* values across a wide range so every pair
- * clears the rule's threshold. The minimum-disruption fix — same
- * palette identity, just spaced out.
- *
- * Drops out via `applicableWhen` only if the colours can't be parsed.
- */
-export const redistributeLightnessRec: Recommendation = {
-  id: 'lightness-redistribute',
-  label: "Redistribute lightness across the palette",
-  description:
-    "Keeps your palette's hues and saturations but pushes the colours " +
-    "apart in lightness, so they remain distinguishable in grayscale. " +
-    "Each colour's identity is preserved — only how light or dark it " +
-    "is changes. The most targeted fix, since the original colours are " +
-    "kept in spirit.",
-  family: 'adjustment',
-
-  applicableWhen(issue) {
-    const ev = readLightnessEvidence(issue);
-    if (!ev) return false;
-    if (!isCategoricalIssue(ev)) return false;
-    if (ev.originalColors.length < 2) return false;
-    // Try the redistribution; if any colour can't be parsed, bail.
-    return redistributeLightness(ev.originalColors) != null;
-  },
-
-  apply(issue, spec) {
-    const ev = readLightnessEvidence(issue);
-    if (!ev) return spec;
-    const redistributed = redistributeLightness(ev.originalColors);
-    if (!redistributed) return spec;
-    return setRange(spec, parentPointer(issue.jsonPointer), redistributed);
-  },
-};
-
-// ─── Categorical: switch to Okabe-Ito ───────────────────────────
-
-/**
- * "Switch to Okabe-Ito palette".
- *
- * The fallback for the categorical case: a hand-picked palette
- * (Okabe & Ito, 2008) designed for color vision deficiency that
- * also has well-distributed lightness. Sliced to the actual
- * category count so the spec is only as long as it needs to be.
- *
- * Same palette `colorblindSafetyRecs` offers for CVD failures, but
- * arrived at via a different correctness story: there it's the
- * de-facto CVD-safe standard; here it's "a palette guaranteed to
- * have good L* separation at any reasonable category count".
- */
-export const switchToOkabeItoForLightness: Recommendation = {
-  id: 'lightness-swap-to-okabe-ito',
-  label: 'Switch to Okabe-Ito palette',
-  description:
-    'Replaces the current palette with the Okabe-Ito 8-colour scheme — ' +
-    'hand-designed for color vision deficiency with well-separated ' +
-    'lightness values across its colours. Strong default for ' +
-    'accessibility, but drops your original palette entirely.',
-  family: 'replacement',
-
-  applicableWhen(issue) {
-    const ev = readLightnessEvidence(issue);
-    if (!ev) return false;
-    if (!isCategoricalIssue(ev)) return false;
-    // Don't offer if the data uses more categories than the palette has.
-    if (
-      ev.originalColors.length === 0 ||
-      ev.originalColors.length > OKABE_ITO_PALETTE.length
-    ) {
-      return false;
-    }
-    // Only offer Okabe-Ito if it ACTUALLY clears the lightness issue at
-    // this category count. Okabe-Ito is a HUE-separated palette: its
-    // orange (#2) and sky blue (#3) sit at almost the same L*, so any
-    // slice of 3+ colours re-triggers the very warning we're fixing.
-    // And when the author's palette already IS Okabe-Ito's first N,
-    // applying it would be a no-op. Verifying against the rule's own
-    // analysis handles both cases (a passing palette necessarily differs
-    // from the failing one that triggered the issue), and keeps this
-    // consistent with the catalogue scheme swaps below.
-    const sliced = OKABE_ITO_PALETTE.slice(0, ev.originalColors.length);
-    return isCategoricalLightnessSafe(sliced);
-  },
-
-  apply(issue, spec) {
-    const ev = readLightnessEvidence(issue);
-    if (!ev) return spec;
-    const sliced = OKABE_ITO_PALETTE.slice(0, ev.originalColors.length);
-    return setRange(spec, parentPointer(issue.jsonPointer), sliced);
-  },
-};
 
 // ─── Sequential / diverging: catalogue scheme swaps ─────────────
 
 /**
  * Build a "swap to {scheme}" recommendation for one specific safe
  * candidate. The applicableWhen verifies safety at apply-time
- * against the issue's actual scale type and category count, so a
- * generated rec only ever appears when it's genuinely a fix.
+ * against the issue's actual scale type, so a generated rec only
+ * ever appears when it's genuinely a fix.
  */
 function buildSchemeSwapRec(args: {
   schemeName: string;
-  schemeType: SchemeType;
+  schemeType: 'sequential' | 'diverging';
   description: string;
 }): Recommendation {
   return {
@@ -237,8 +102,6 @@ function buildSchemeSwapRec(args: {
 
       const safe = findLightnessSafeSchemes({
         scaleType: args.schemeType,
-        categoryCount:
-          args.schemeType === 'categorical' ? ev.originalColors.length : undefined,
         excludeSchemeName: ev.schemeName,
       });
       return safe.some((s) => s.name === args.schemeName);
@@ -269,7 +132,7 @@ function buildSchemeSwapRec(args: {
 // schemes often fail monotonicity, and redgrey has a deliberately
 // gray half that fails range checks.
 
-const CANDIDATES: {name: string; type: SchemeType; description: string}[] = [
+const CANDIDATES: {name: string; type: 'sequential' | 'diverging'; description: string}[] = [
   // ── Sequential ────────────────────────────────────────────────
   {
     name: 'viridis',
@@ -308,39 +171,6 @@ const CANDIDATES: {name: string; type: SchemeType; description: string}[] = [
     description:
       'Perceptually uniform sequential palette with a magenta-to-yellow ' +
       'progression.',
-  },
-
-  // ── Categorical ──────────────────────────────────────────────
-  // Included for completeness; rarely pass at typical category
-  // counts, but the per-rec safety filter handles that correctly.
-  {
-    name: 'tableau10',
-    type: 'categorical',
-    description:
-      "Tableau's standard categorical palette. May appear here when " +
-      'sliced to a small number of categories where its lightness ' +
-      'separation happens to be sufficient.',
-  },
-  {
-    name: 'dark2',
-    type: 'categorical',
-    description:
-      'Higher-saturation ColorBrewer categorical palette. As above — ' +
-      'whether it passes depends on how many categories the data uses.',
-  },
-  {
-    name: 'set2',
-    type: 'categorical',
-    description:
-      'Muted ColorBrewer categorical palette. As above — whether it ' +
-      'passes depends on the category count.',
-  },
-  {
-    name: 'observable10',
-    type: 'categorical',
-    description:
-      "Observable's default categorical palette. As above — whether it " +
-      'passes depends on the category count.',
   },
 
   // ── Diverging ────────────────────────────────────────────────
@@ -403,11 +233,7 @@ function getSchemeSwapRecommendations(): Recommendation[] {
 // ─── Registry ────────────────────────────────────────────────────
 
 export const lightnessContrastRecommendations: Recommendation[] = [
-  // Categorical-specific: targeted (redistribute) and broad (Okabe-Ito)
-  // both come first so they appear at the top of the categorical card.
-  redistributeLightnessRec,
-  switchToOkabeItoForLightness,
-  // Catalogue scheme swaps for all three shapes — the safety filter
-  // routes each candidate to the right issue.
+  // Catalogue scheme swaps for sequential and diverging shapes —
+  // the safety filter routes each candidate to the right issue.
   ...getSchemeSwapRecommendations(),
 ];

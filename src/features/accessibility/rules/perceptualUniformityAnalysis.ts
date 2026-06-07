@@ -62,7 +62,7 @@ export const CV_OK_THRESHOLD = 0.3;
  * CV between OK and WARNING → moderately uneven (info).
  * Typical values: some diverging schemes ~0.35.
  */
-export const CV_WARNING_THRESHOLD = 0.5;
+export const CV_WARNING_THRESHOLD = 0.3;
 
 /**
  * Max/min step ratio above this → localized jump (warning) for

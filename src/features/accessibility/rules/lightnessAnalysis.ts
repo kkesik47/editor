@@ -12,11 +12,7 @@
  * to be perceptually uniform — equal numeric differences correspond
  * to roughly equal perceived differences.
  *
- * Four checks are performed, depending on the scale shape:
- *
- *   Categorical scales → all pairs must have ΔL* ≥ 20.
- *     If two categories have similar lightness, they become
- *     indistinguishable in grayscale.
+ * Three checks are performed, depending on the scale shape:
  *
  *   Sequential scales → two checks:
  *     1. Total L* range must be ≥ 40.
@@ -32,20 +28,18 @@
  *     to have non-monotonic global lightness (a V-shape around
  *     the midpoint), so checking the whole sequence at once would
  *     always fail.
+ *
+ *   Categorical scales → not analysed here. Qualitative palettes
+ *     trade lightness uniformity for hue diversity by design
+ *     (Brewer 2003; Wong 2011), so a ΔL* test would flag every
+ *     well-designed qualitative palette. Greyscale legibility for
+ *     categorical data is the colour-only-encoding rule's concern,
+ *     not this rule's.
  */
 
 import {parse, converter, formatHex} from 'culori';
 
 // ─── Constants ───────────────────────────────────────────────────
-
-/**
- * Minimum ΔL* between any two categorical colors.
- *
- * A ΔL* of 20 is roughly the difference between a medium-dark gray
- * and a noticeably different gray. Below this, two categories risk
- * merging in grayscale.
- */
-export const CATEGORICAL_LIGHTNESS_THRESHOLD = 20;
 
 /**
  * Minimum total L* range for a sequential scale.
@@ -78,17 +72,6 @@ export const MONOTONICITY_REVERSAL_THRESHOLD = 5;
 
 // ─── Types ───────────────────────────────────────────────────────
 
-/** A pair of colors that are too close in lightness. */
-export interface LightnessPair {
-  indexA: number;
-  indexB: number;
-  colorA: string;
-  colorB: string;
-  lightnessA: number;
-  lightnessB: number;
-  deltaL: number;
-}
-
 /** A point where lightness reverses direction in a sequential scale. */
 export interface LightnessReversal {
   /** Sample index where the reversal occurs. */
@@ -103,12 +86,8 @@ export interface LightnessReversal {
 export interface LightnessAnalysisResult {
   /** L* values for each color in the input array. */
   lightnessValues: number[];
-  /** The smallest ΔL* found between any two colors (categorical). */
-  minDeltaL: number;
   /** The total L* range: max(L*) - min(L*) (sequential). */
   totalRange: number;
-  /** Pairs that fell below the categorical threshold. */
-  problematicPairs: LightnessPair[];
   /** Whether the L* profile is monotonic (sequential scales). */
   isMonotonic: boolean;
   /** Points where lightness reverses direction (empty if monotonic). */
@@ -265,17 +244,14 @@ function checkMonotonicity(
 // ─── Analysis ────────────────────────────────────────────────────
 
 /**
- * Analyze the lightness distribution of a set of colors.
+ * Analyze the lightness distribution of an ordered (sequential) scale.
  *
- * Used for categorical and sequential scales. For diverging scales,
- * use `analyzeDivergingLightness` instead, since global monotonicity
- * does not apply.
+ * For diverging scales, use `analyzeDivergingLightness` instead, since
+ * global monotonicity does not apply.
  *
  * Extracts CIELAB L* for each color and computes:
- *   - All pairwise ΔL* values (for categorical threshold checks)
  *   - Total L* range (for sequential threshold checks)
  *   - Monotonicity (for sequential direction checks)
- *   - Which pairs fall below the categorical threshold
  *
  * Colors that fail to parse are skipped silently.
  */
@@ -299,37 +275,9 @@ export function analyzeLightness(colors: string[]): LightnessAnalysisResult {
   // Check monotonicity
   const {isMonotonic, reversals} = checkMonotonicity(lightnessValues);
 
-  // Find all pairs below the categorical threshold
-  const problematicPairs: LightnessPair[] = [];
-  let minDeltaL = Infinity;
-
-  for (let i = 0; i < entries.length; i++) {
-    for (let j = i + 1; j < entries.length; j++) {
-      const deltaL = round1(Math.abs(entries[i].lightness - entries[j].lightness));
-
-      if (deltaL < minDeltaL) {
-        minDeltaL = deltaL;
-      }
-
-      if (deltaL < CATEGORICAL_LIGHTNESS_THRESHOLD) {
-        problematicPairs.push({
-          indexA: entries[i].index,
-          indexB: entries[j].index,
-          colorA: entries[i].color,
-          colorB: entries[j].color,
-          lightnessA: entries[i].lightness,
-          lightnessB: entries[j].lightness,
-          deltaL,
-        });
-      }
-    }
-  }
-
   return {
     lightnessValues,
-    minDeltaL: minDeltaL === Infinity ? 0 : round1(minDeltaL),
     totalRange,
-    problematicPairs,
     isMonotonic,
     reversals,
   };

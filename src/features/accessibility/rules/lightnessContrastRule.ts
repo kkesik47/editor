@@ -4,9 +4,7 @@
  * Accessibility rule that checks whether colors in a Vega-Lite
  * color scale remain distinguishable when viewed in grayscale.
  *
- * Five checks across three scale shapes:
- *
- *   Categorical → all pairs must have ΔL* ≥ 20
+ * Four checks across two scale shapes:
  *
  *   Sequential  → total L* range must be ≥ 40
  *                 L* must progress monotonically (no reversals)
@@ -19,9 +17,16 @@
  * profile by design — checking the whole sequence for monotonicity
  * would always fail.
  *
+ * Categorical scales are deliberately excluded: qualitative palettes
+ * trade lightness uniformity for hue diversity by design (Brewer
+ * 2003; Wong 2011), so a ΔL* test would flag every well-designed
+ * qualitative palette. The colour-only-encoding rule (WCAG 1.4.1)
+ * is the right place to surface greyscale-legibility concerns for
+ * categorical data.
+ *
  * Architecture:
  *   1. resolveScaleColors  — reused from the CVD rule
- *   2. analyzeLightness    — categorical / sequential analysis
+ *   2. analyzeLightness    — sequential analysis
  *   3. analyzeDivergingLightness — per-half diverging analysis
  *   4. toGrayscale         — convert colors to gray equivalents
  *   5. this file           — orchestrate and produce issues
@@ -35,62 +40,12 @@ import {
   toGrayscale,
   type LightnessAnalysisResult,
   type DivergingLightnessAnalysisResult,
-  CATEGORICAL_LIGHTNESS_THRESHOLD,
   SEQUENTIAL_LIGHTNESS_RANGE_THRESHOLD,
   DIVERGING_HALF_LIGHTNESS_RANGE_THRESHOLD,
 } from './lightnessAnalysis.js';
 import {MORELAND_2009, CRAMERI_2020, BERGMAN_1995} from '../references.js';
 
-// ─── Issue builders: categorical & sequential ───────────────────
-
-/**
- * Build an issue for a categorical scale with pairs too close in L*.
- */
-function buildCategoricalIssue(
-  scale: ResolvedScale,
-  analysis: LightnessAnalysisResult,
-  grayscaleColors: string[],
-): AccessibilityIssue {
-  const pairCount = analysis.problematicPairs.length;
-  const pairWord = pairCount === 1 ? 'pair' : 'pairs';
-
-  return {
-    ruleId: 'vl-a11y-lightness-contrast:categorical',
-    severity: 'info',
-
-    message:
-      `${pairCount} color ${pairWord} in the '${scale.channel}' scale ` +
-      `have similar lightness (min ΔL* = ${analysis.minDeltaL}, ` +
-      `threshold = ${CATEGORICAL_LIGHTNESS_THRESHOLD}). ` +
-      `These colors may be hard to tell apart in grayscale or ` +
-      `for users with very low color vision.`,
-
-    suggestion:
-      'Choose colors with more varied lightness values, or add ' +
-      'redundant encodings such as shape, pattern, or direct labels.',
-
-    jsonPointer: scale.jsonPointer,
-
-    evidence: {
-      checkType: 'categorical-pairs',
-      channel: scale.channel,
-      scaleType: scale.scaleType,
-      schemeName: scale.schemeName ?? null,
-      minDeltaL: analysis.minDeltaL,
-      threshold: CATEGORICAL_LIGHTNESS_THRESHOLD,
-      lightnessValues: analysis.lightnessValues,
-      originalColors: scale.colors,
-      grayscaleColors,
-      problematicPairs: analysis.problematicPairs.map((pair) => ({
-        colorA: pair.colorA,
-        colorB: pair.colorB,
-        lightnessA: pair.lightnessA,
-        lightnessB: pair.lightnessB,
-        deltaL: pair.deltaL,
-      })),
-    },
-  };
-}
+// ─── Issue builders: sequential ─────────────────────────────────
 
 /**
  * Build an issue for a sequential scale with insufficient L* range.
@@ -308,12 +263,14 @@ export const lightnessContrastRule: AccessibilityRule = {
   id: 'vl-a11y-lightness-contrast',
 
   description:
-    'Checks whether colors in explicit color scales have sufficient ' +
-    'lightness separation to remain distinguishable in grayscale. ' +
-    'Categorical scales are checked pairwise; sequential scales for ' +
-    'total range and global monotonicity; diverging scales per-half ' +
+    'Checks whether colors in ordered (sequential or diverging) color ' +
+    'scales have sufficient lightness progression to remain readable ' +
+    'in grayscale. Sequential scales are checked for total L* range ' +
+    'and global monotonicity; diverging scales are checked per-half ' +
     'for range and monotonicity (their lightness is expected to form ' +
-    'a V around the midpoint).',
+    'a V around the midpoint). Categorical scales are not analysed — ' +
+    'qualitative palettes trade lightness uniformity for hue diversity ' +
+    'by design.',
 
   references: [MORELAND_2009, CRAMERI_2020, BERGMAN_1995],
   evaluate(spec: Record<string, unknown>): AccessibilityIssue[] {
@@ -323,12 +280,14 @@ export const lightnessContrastRule: AccessibilityRule = {
     for (const scale of scales) {
       const grayscaleColors = toGrayscale(scale.colors);
 
+      // Categorical scales are not analysed: qualitative palettes
+      // trade lightness uniformity for hue diversity by design
+      // (Brewer 2003; Wong 2011).
       if (scale.scaleType === 'categorical') {
-        const analysis = analyzeLightness(scale.colors);
-        if (analysis.problematicPairs.length > 0) {
-          issues.push(buildCategoricalIssue(scale, analysis, grayscaleColors));
-        }
-      } else if (scale.scaleType === 'diverging') {
+        continue;
+      }
+
+      if (scale.scaleType === 'diverging') {
         const analysis = analyzeDivergingLightness(scale.colors);
 
         // Per-half range: each side must span enough L* to be readable.

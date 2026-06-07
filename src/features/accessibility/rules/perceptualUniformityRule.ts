@@ -299,7 +299,7 @@ function buildSequentialInfo(
       `spaced data values, some intervals produce a noticeably larger ` +
       `color change than others (${analysis.maxMinRatio}× difference). ` +
       `Unevenness score (CV): ${analysis.cv} (0 = perfectly even, ` +
-      `above 0.5 = problematic). This may not faithfully represent the data.`,
+      `above 0.3 = problematic). This may not faithfully represent the data.`,
     suggestion:
       'For more faithful data representation, consider a perceptually ' +
       'uniform scheme like "viridis" or "cividis".',
@@ -379,7 +379,7 @@ function buildDivergingInfo(
       `somewhat uneven color distribution within its ${sideText}. Some ` +
       `intervals produce a noticeably larger color change than others ` +
       `(${worst.maxMinRatio}× difference). Unevenness score (CV): ` +
-      `${worst.cv} (0 = perfectly even, above 0.5 = problematic). ` +
+      `${worst.cv} (0 = perfectly even, above 0.3 = problematic). ` +
       `This may not faithfully represent the data.`,
     suggestion:
       'For more faithful data representation, consider a perceptually ' +
