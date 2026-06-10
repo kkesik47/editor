@@ -61,6 +61,7 @@ const DEFAULT_AXIS_LABEL_FONT_SIZE = 10;
 const DEFAULT_AXIS_TITLE_FONT_SIZE = 10;
 const DEFAULT_LEGEND_LABEL_FONT_SIZE = 10;
 const DEFAULT_LEGEND_TITLE_FONT_SIZE = 10;
+const DEFAULT_TEXT_MARK_FONT_SIZE = 11;
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -147,6 +148,21 @@ function readPath(obj: Record<string, any>, path: string[]): unknown {
 function hasObjectAtPath(obj: Record<string, any>, path: string[]): boolean {
   const value = readPath(obj, path);
   return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Extract the mark type from a view node.
+ *
+ * Handles both shorthand ("mark": "text") and object form
+ * ("mark": {"type": "text", ...}).
+ */
+function resolveMarkType(node: Record<string, any>): string | null {
+  const mark = node?.mark;
+  if (typeof mark === 'string') return mark;
+  if (mark && typeof mark === 'object' && typeof (mark as any).type === 'string') {
+    return (mark as any).type;
+  }
+  return null;
 }
 
 // ─── Shared resolution logic ─────────────────────────────────────
@@ -421,9 +437,20 @@ function checkLegendChannel(
   const channelDef = node?.encoding?.[channel];
   if (!channelDef || typeof channelDef !== 'object') return [];
   if ('value' in channelDef) return []; // value channel → no legend
-  if (typeof channelDef.field !== 'string') return []; // legend needs a field
 
-  const field = channelDef.field;
+  // A legend renders for channels that bind a field OR carry an
+  // aggregate (e.g. `{aggregate: "count"}` produces a count-based
+  // legend with no per-record field). Skip channels with neither.
+  const field = typeof channelDef.field === 'string' ? channelDef.field : null;
+  const aggregate = typeof channelDef.aggregate === 'string' ? channelDef.aggregate : null;
+  if (!field && !aggregate) return [];
+
+  // Dedup identity: channels mapping the SAME field share one merged
+  // legend (e.g. color + shape on "origin" → one legend), so field
+  // keys best when present. Aggregate-without-field channels don't
+  // merge across channels, so the channel name disambiguates them.
+  const legendIdentity = field ?? `aggregate-${channel}`;
+
   const legendLabel = LEGEND_LABELS[channel] ?? channel;
   const defaultPtr = legendDefaultPointer(node, channel, pointer);
   const entries: FontSizeEntry[] = [];
@@ -439,7 +466,7 @@ function checkLegendChannel(
       configPath: ['config', 'legend', 'labelFontSize'],
       defaultSize: DEFAULT_LEGEND_LABEL_FONT_SIZE,
       defaultPointer: defaultPtr,
-      elementKey: `${cs}:legend:${field}:label`,
+      elementKey: `${cs}:legend:${legendIdentity}:label`,
     }),
   );
 
@@ -454,11 +481,63 @@ function checkLegendChannel(
       configPath: ['config', 'legend', 'titleFontSize'],
       defaultSize: DEFAULT_LEGEND_TITLE_FONT_SIZE,
       defaultPointer: defaultPtr,
-      elementKey: `${cs}:legend:${field}:title`,
+      elementKey: `${cs}:legend:${legendIdentity}:title`,
     }),
   );
 
   return entries;
+}
+
+// ─── Text mark check ─────────────────────────────────────────────
+
+/**
+ * Check the font size of a `mark: "text"` layer.
+ *
+ * Text marks render data values as on-chart text (e.g. the row
+ * labels around a Likert plot). That text is data-label text, so the
+ * LABEL threshold (13 px) applies — same tier as axis tick labels and
+ * legend entry labels.
+ *
+ * Resolution order:
+ *   1. mark.fontSize          (only meaningful when mark is an object)
+ *   2. config.text.fontSize
+ *   3. Vega-Lite default (11 px)
+ *
+ * Skipped when the view's mark is not "text". Returns null rather than
+ * an empty array because a view has at most one mark.
+ *
+ * elementKey embeds the full view pointer, so two sibling text-mark
+ * layers stay distinct under dedupeByElement — they may carry
+ * different inline sizes and must not collapse to one entry.
+ */
+function checkTextMark(
+  node: Record<string, any>,
+  rootSpec: Record<string, any>,
+  pointer: string,
+): FontSizeEntry | null {
+  if (resolveMarkType(node) !== 'text') return null;
+
+  const mark = node.mark;
+  const inlineValue =
+    mark && typeof mark === 'object' && !Array.isArray(mark)
+      ? (mark as Record<string, any>).fontSize
+      : undefined;
+
+  return resolveChannelFontSize(rootSpec, {
+    label: 'Text mark labels',
+    configKey: 'text.fontSize',
+    role: 'label',
+    inlineValue,
+    inlinePointer: `${pointer}/mark/fontSize`,
+    configPath: ['config', 'text', 'fontSize'],
+    defaultSize: DEFAULT_TEXT_MARK_FONT_SIZE,
+    // The mark property is guaranteed to exist on this view (we
+    // returned null otherwise), so it's a safe default target whether
+    // it's a shorthand string or an object — Monaco can underline
+    // either form.
+    defaultPointer: `${pointer}/mark`,
+    elementKey: `text-mark:${pointer}`,
+  });
 }
 
 // ─── Composition walk ────────────────────────────────────────────
@@ -571,6 +650,10 @@ export function analyzeFontSizes(
 
     const titleEntry = checkChartTitle(node, spec, pointer, cs);
     if (titleEntry) entries.push(titleEntry);
+
+    // Text marks rendering data values as on-chart text.
+    const textMarkEntry = checkTextMark(node, spec, pointer);
+    if (textMarkEntry) entries.push(textMarkEntry);
 
     if (node.encoding && typeof node.encoding === 'object') {
       for (const channel of AXIS_CHANNELS) {

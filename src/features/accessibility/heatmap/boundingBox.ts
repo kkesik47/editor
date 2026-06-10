@@ -135,16 +135,62 @@ export function collectAbsoluteBoxes(root: SceneItem, accept: (item: SceneItem) 
  * don't cluster cleanly with their neighbours. */
 const SPREAD_MARKTYPES = new Set(['line', 'area', 'trail', 'arc']);
 
-export function collectDataMarkBoxes(root: SceneItem): BoundingBox[] {
+/** Marktypes that render glyphs — they belong to the TEXT branch of
+ * the heatmap (text contrast / font size), never to non-text contrast
+ * or any colour-scale rule. Skipping them here keeps colour-scale
+ * resolvers from painting orange over chart labels like axis-value
+ * text marks. */
+const TEXT_MARKTYPES = new Set(['text']);
+
+/**
+ * Walk the scenegraph and return the absolute bounding box of each
+ * individual data mark — the symbols, rects, lines etc. that Vega
+ * draws to represent the data.
+ *
+ * ... (existing doc comment) ...
+ *
+ * Pass `layerIndex` to scope to one layer's mark group only. Layers
+ * map 1-to-1 to `role: 'mark'` groups in DFS order (Vega-Lite renders
+ * layers in spec order), so the Nth mark group is layer N. Pass null
+ * (the default) to collect every layer's marks — that matches the
+ * top-level / single-unit case and rules whose scope is global.
+ */
+export function collectDataMarkBoxes(
+  root: SceneItem,
+  layerIndex: number | null = null,
+): BoundingBox[] {
   const out: BoundingBox[] = [];
+  let markGroupCount = 0;
 
   const visit = (item: SceneItem, offsetX: number, offsetY: number, insideMarkGroup: boolean) => {
-    // Spread marktypes: record the mark group's own bounds as one box
-    // and stop descending. Per-leaf is the wrong granularity for these.
-    if (item.role === 'mark' && item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
-      const b = item.bounds;
-      out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
-      return;
+    if (item.role === 'mark') {
+      // Count BEFORE any branching: every mark group must advance the
+      // counter, including text marks and other-layer groups we skip
+      // below. Otherwise layer N would map to the wrong scenegraph
+      // group on specs with mixed marktypes across layers.
+      const groupLayerIndex = markGroupCount;
+      markGroupCount++;
+
+      // Text mark groups belong to the text branch of the heatmap —
+      // never to non-text contrast or any colour-scale rule.
+      if (item.marktype && TEXT_MARKTYPES.has(item.marktype)) {
+        return;
+      }
+
+      // Layer scoping: drop other layers' mark groups when a target
+      // layer was named. Skips e.g. a black tick layer when only the
+      // sibling circle layer carries the failing colour.
+      if (layerIndex !== null && groupLayerIndex !== layerIndex) {
+        return;
+      }
+
+      // Spread marktypes: record the mark group's own bounds as one
+      // box and stop descending. Per-leaf is the wrong granularity.
+      if (item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
+        const b = item.bounds;
+        out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
+        return;
+      }
     }
 
     // Discrete marktypes: record each leaf scene item inside the mark group.

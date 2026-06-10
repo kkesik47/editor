@@ -554,10 +554,10 @@ export function buildTextSamplePreviewDataUri(issue: AccessibilityIssue): string
   let captionText: string;
   let captionColor: string;
   if (isAAA) {
-    captionText = `${formatNumber(ratio)}:1 — passes AA, falls short of AAA (≥${formatNumber(limit)}:1)`;
+    captionText = `${formatNumber(ratio)}:1 - passes AA, falls short of AAA (≥${formatNumber(limit)}:1)`;
     captionColor = COLOR_AAA;
   } else {
-    captionText = `${formatNumber(ratio)}:1 — fails AA (needs ≥${formatNumber(limit)}:1)`;
+    captionText = `${formatNumber(ratio)}:1 - fails AA (needs ≥${formatNumber(limit)}:1)`;
     captionColor = COLOR_FAIL;
   }
 

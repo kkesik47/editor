@@ -30,28 +30,38 @@ import {collectAbsoluteBoxes, collectDataMarkBoxes, unionBounds} from './boundin
 import type {IssueResolver, ResolverContext} from './resolvers.js';
 import {channelFromLabel, channelFromPointer, locateTextElement, type TextElementKind} from './textElements.js';
 
-/**
- * Highlight the coloured data marks and the legend(s) that show the
- * scale. Shared by all colour-scale rules.
- */
-export const colorScaleResolver: IssueResolver = (_issue: AccessibilityIssue, ctx: ResolverContext): BoundingBox[] => {
+
+/** Extract N from a /layer/N/... pointer. Returns null for pointers
+ * without a layer prefix (top-level specs, config-source issues),
+ * which means "all layers". Mirrors the helper in fontSizeResolver. */
+function topLayerIndexFromPointer(pointer: string): number | null {
+  const match = /^\/layer\/(\d+)(?:\/|$)/.exec(pointer ?? '');
+  return match ? Number(match[1]) : null;
+}
+
+export const colorScaleResolver: IssueResolver = (issue: AccessibilityIssue, ctx: ResolverContext): BoundingBox[] => {
   const root = ctx.scenegraphRoot;
 
-  // One box per individual data mark instead of one box over the
-  // entire mark group. With sparse marks (three scatter points, a
-  // few bars), the group's bounds cover the whole plot area; per-mark
-  // boxes keep the blobs on the marks themselves and let clustering
-  // merge nearby ones.
-  const marks = collectDataMarkBoxes(root);
+  // Scope to the layer named in the issue's pointer when there is one.
+  // Layer 0 might carry the failing /encoding/color/value while sibling
+  // layers use unrelated colours — highlighting them would attribute
+  // the failure to marks that aren't the cause.
+  const layerIndex = topLayerIndexFromPointer(issue.jsonPointer);
+  const marks = collectDataMarkBoxes(root, layerIndex);
 
-  // Legend entries (coloured symbols + labels) — coarse box per
-  // legend; the title stays separate so font-size issues there
-  // don't get absorbed into this cluster.
-  const legendEntries = collectAbsoluteBoxes(root, (item) => item.role === 'legend-entry');
-  const legendBox = unionBounds(legendEntries);
-  const legends = legendBox ? [legendBox] : [];
+  // Per-entry boxes (no union) so the heatmap clusters them into
+  // focused blobs over each legend row, matching the per-mark
+  // approach above. Legend TITLE is intentionally NOT included: with
+  // per-entry blobs the title would render as its own separate
+  // accusation, which reads as "the title fails contrast" — but the
+  // title is text in the default colour, the failing element is the
+  // entries themselves.
+  const legendBoxes = collectAbsoluteBoxes(
+    root,
+    (item) => item.role === 'legend-entry',
+  );
 
-  return [...marks, ...legends];
+  return [...marks, ...legendBoxes];
 };
 
 /**

@@ -192,7 +192,7 @@ function buildScaleAAIssue(result: ScaleContrastResult, bg: string): Accessibili
     severity: 'warning',
 
     message:
-      `${count} color${count > 1 ? 's' : ''} in the '${result.channel}' ` +
+      `${count} color${count > 1 ? 's' : ''} in the ${result.channel} ` +
       `scale${schemeNote} ${count > 1 ? 'have' : 'has'} insufficient ` +
       `contrast against the background "${bg}" ` +
       `(worst ratio: ${result.worstRatio}:1, ` +

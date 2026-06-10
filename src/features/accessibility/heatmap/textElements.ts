@@ -118,6 +118,64 @@ function identifyAxes(root: SceneItem): Record<Channel, AxisRegion> {
   return axes;
 }
 
+/**
+ * Collect per-glyph boxes for one axis's tick labels.
+ *
+ * Each `role: 'axis-label'` item is the GROUP that contains all of one
+ * axis's tick-label glyphs, with bounds covering the whole row/column.
+ * Using those bounds gives a single elongated blob spanning every
+ * label; walking into the group and recording each leaf gives the
+ * heatmap something to cluster into focused per-label blobs.
+ *
+ * Channel identification mirrors identifyAxes: a horizontal spread is
+ * x, a vertical column is y.
+ */
+function collectAxisLabelLeaves(root: SceneItem, channel: Channel): BoundingBox[] {
+  const out: BoundingBox[] = [];
+
+  const recordLeaves = (
+    item: SceneItem,
+    offsetX: number,
+    offsetY: number,
+  ): void => {
+    const isLeaf = !item.items || item.items.length === 0;
+    if (item.bounds && isLeaf) {
+      const b = item.bounds;
+      out.push({
+        x: b.x1 + offsetX,
+        y: b.y1 + offsetY,
+        width: b.x2 - b.x1,
+        height: b.y2 - b.y1,
+      });
+    }
+    const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+    const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+    item.items?.forEach((child) => recordLeaves(child, childX, childY));
+  };
+
+  const visit = (item: SceneItem, offsetX: number, offsetY: number): void => {
+    if (item.role === 'axis-label' && item.bounds) {
+      const groupChannel: Channel =
+        item.bounds.x2 - item.bounds.x1 >= item.bounds.y2 - item.bounds.y1
+          ? 'x'
+          : 'y';
+      if (groupChannel === channel) {
+        const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+        const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+        item.items?.forEach((child) => recordLeaves(child, childX, childY));
+      }
+      // Axis-label groups don't nest; stop here either way.
+      return;
+    }
+    const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+    const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+    item.items?.forEach((child) => visit(child, childX, childY));
+  };
+
+  visit(root, 0, 0);
+  return out;
+}
+
 // ─── Placement ───────────────────────────────────────────────────
 
 /**
@@ -136,17 +194,102 @@ export function locateTextElement(kind: TextElementKind, channel: Channel | null
     case 'legend-title':
       return collectAbsoluteBoxes(root, (item) => item.role === 'legend-title');
 
-    case 'axis-label':
-    case 'axis-title': {
-      const axes = identifyAxes(root);
-      const pick = (region: AxisRegion): BoundingBox | null =>
-        kind === 'axis-title' ? region.title : region.labels;
+    case 'axis-label': {
+      if (channel) return collectAxisLabelLeaves(root, channel);
+      return [
+        ...collectAxisLabelLeaves(root, 'x'),
+        ...collectAxisLabelLeaves(root, 'y'),
+      ];
+    }
 
+    case 'axis-title': {
+      // Titles stay as one box per axis — a single rotated word has no
+      // sub-elements worth clustering.
+      const axes = identifyAxes(root);
       if (channel) {
-        const box = pick(axes[channel]);
+        const box = axes[channel].title;
         return box ? [box] : [];
       }
-      return [pick(axes.x), pick(axes.y)].filter((box): box is BoundingBox => box !== null);
+      return [axes.x.title, axes.y.title].filter(
+        (box): box is BoundingBox => box !== null,
+      );
+    }
     }
   }
+
+  // ─── Text-mark placement (layer-scoped) ──────────────────────────
+
+/**
+ * Locate the text glyphs belonging to one `mark: text` layer.
+ *
+ * Text marks scope by LAYER (not by channel like axes do), so they
+ * sit outside locateTextElement's (kind, channel) shape and get their
+ * own function instead.
+ *
+ * Layer identification: Vega-Lite renders layers in spec order, one
+ * `role: 'mark'` group per layer, so the Nth `role: 'mark'` group
+ * encountered in DFS order corresponds to spec layer N. The group's
+ * marktype must be 'text' for the issue to apply; if not, we return
+ * empty (the pointer named a non-text-mark layer somehow — should not
+ * happen in practice, but defensive).
+ *
+ * Pass `layerIndex = null` to cover EVERY text-mark glyph on the
+ * chart. That's the right scope for config-source issues, whose
+ * pointer is /config/text/fontSize and applies to all text marks at
+ * once.
+ *
+ * Returns per-glyph boxes (no union) so the heatmap clusters them
+ * into focused blobs over each label, mirroring colorScaleResolver's
+ * use of collectDataMarkBoxes.
+ *
+ * Limitation: only top-level /layer/N/mark pointers are handled; a
+ * nested-layer pointer like /layer/0/layer/2/mark would resolve the
+ * wrong group. Adequate for the specs we've seen.
+ */
+export function locateTextMarkForLayer(
+  root: SceneItem,
+  layerIndex: number | null,
+): BoundingBox[] {
+  const out: BoundingBox[] = [];
+  let markGroupCount = 0;
+
+  const visit = (
+    item: SceneItem,
+    offsetX: number,
+    offsetY: number,
+    insideTargetGroup: boolean,
+  ): void => {
+    let nextInside = insideTargetGroup;
+
+    if (item.role === 'mark') {
+      const isText = item.marktype === 'text';
+      const isTargetLayer =
+        layerIndex === null || markGroupCount === layerIndex;
+      markGroupCount++;
+
+      // Skip the entire mark group if it isn't the layer we want, or
+      // if it isn't a text mark at all. Mark groups don't nest, so
+      // skipping descent here is safe.
+      if (!isText || !isTargetLayer) return;
+      nextInside = true;
+    }
+
+    const isLeaf = !item.items || item.items.length === 0;
+    if (insideTargetGroup && item.bounds && isLeaf) {
+      const b = item.bounds;
+      out.push({
+        x: b.x1 + offsetX,
+        y: b.y1 + offsetY,
+        width: b.x2 - b.x1,
+        height: b.y2 - b.y1,
+      });
+    }
+
+    const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+    const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+    item.items?.forEach((child) => visit(child, childX, childY, nextInside));
+  };
+
+  visit(root, 0, 0, false);
+  return out;
 }

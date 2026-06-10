@@ -286,7 +286,7 @@ function buildIssue(match: ColorOnlyMatch): AccessibilityIssue {
       `The "${match.fieldName}" field is encoded only through ` +
       `${channelLabel} (${match.fieldType}). WCAG 1.4.1 (Level A) ` +
       `requires that color is not the sole means of conveying ` +
-      `information — users who cannot distinguish colors will not ` +
+      `information - users who cannot distinguish colors will not ` +
       `be able to tell categories apart.`,
 
     suggestion: buildSuggestion(match.markType, match.channel),

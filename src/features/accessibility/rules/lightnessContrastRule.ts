@@ -221,7 +221,7 @@ function buildDivergingMonotonicityIssue(
 
   return {
     ruleId: 'vl-a11y-lightness-contrast:diverging-non-monotonic',
-    severity: 'warning',
+    severity: 'info',
 
     message:
       `The '${scale.channel}' diverging scale${schemeNote} has ` +

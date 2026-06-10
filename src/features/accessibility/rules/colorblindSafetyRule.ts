@@ -130,7 +130,7 @@ function buildIssues(
 
       message:
         `Under ${label} simulation, some ${pairKind} in the ` +
-        `'${scale.channel}' scale${schemeNote} ${impact} ` +
+        `${scale.channel} scale${schemeNote} ${impact} ` +
         `(min ΔE = ${result.minDeltaE}, threshold = ${threshold}).`,
 
       suggestion:
