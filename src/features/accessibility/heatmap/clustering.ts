@@ -62,6 +62,26 @@ function worse(a: Severity, b: Severity): Severity {
 }
 
 /**
+ * Pointer-shape priority for what a cluster click should jump to.
+ *
+ * When several contrast issues land in one cluster — typically a
+ * `condition.value` lightgray fallback alongside failing
+ * `condition.scale.range` colours on the same marks — we want
+ * `keys[0]` to be the issue that matches the marks' currently
+ * rendered colours. The value fallback only manifests under
+ * interaction (a selection actively excluding items); the scale
+ * range is what the marks actually paint with by default. So
+ * scale-related pointers rank above bare `/value` pointers.
+ *
+ * Lower number = higher priority (sorts first).
+ */
+function pointerPriority(pointer: string): number {
+  if (pointer.includes('/scale/') || pointer.includes('/range')) return 1;
+  if (pointer.endsWith('/value')) return 3;
+  return 2;
+}
+
+/**
  * Greedy single-pass clustering. Each region joins the first existing
  * cluster it overlaps with (against ANY member, so chains A–B–C merge
  * correctly); otherwise it starts a new one. Region counts are tiny
@@ -85,17 +105,21 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
   }
 
   return groups.map((members) => {
-    const box = unionBounds(members.map((m) => m.box))!;
+    // Order members so the cluster's primary issue (keys[0]) reflects
+    // what the user actually sees on the marks — see pointerPriority.
+    const sorted = [...members].sort(
+      (a, b) => pointerPriority(a.issue.jsonPointer) - pointerPriority(b.issue.jsonPointer),
+    );
 
-    // Dedupe by key: one issue can contribute several regions to the
-    // same cluster (rare), and we want it counted once.
+    const box = unionBounds(sorted.map((m) => m.box))!;
+
     const byKey = new Map<string, AccessibilityIssue>();
-    for (const m of members) {
+    for (const m of sorted) {
       byKey.set(m.key, m.issue);
     }
 
     const keys = [...byKey.keys()];
-    const severity = (members[0].issue.severity === 'warning' ? 'warning' : 'info') as Severity;
+    const severity = (sorted[0].issue.severity === 'warning' ? 'warning' : 'info') as Severity;
     return {box, issues: [...byKey.values()], keys, severity, count: keys.length};
   });
 }

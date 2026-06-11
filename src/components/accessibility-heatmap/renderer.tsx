@@ -235,7 +235,7 @@ export default function AccessibilityHeatmap() {
               ry={ry}
               fill={`url(#a11y-blob-${cluster.severity})`}
               opacity={blobOpacity(cluster.count)}
-              onMouseEnter={() => setHover(cluster.keys)}
+              onMouseEnter={() => setHover([cluster.keys[0]])}
               onMouseLeave={() => setHover([])}
               onClick={() => setState((s) => ({
                 ...s,

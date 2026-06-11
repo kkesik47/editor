@@ -20,6 +20,7 @@
 
 import type {BoundingBox, SceneItem} from './boundingBox.js';
 import {collectAbsoluteBoxes} from './boundingBox.js';
+import {computeStructuralMarkGroupMap} from './viewScope.js';
 
 export type TextElementKind = 'chart-title' | 'axis-label' | 'axis-title' | 'legend-label' | 'legend-title';
 
@@ -130,7 +131,10 @@ function identifyAxes(root: SceneItem): Record<Channel, AxisRegion> {
  * Channel identification mirrors identifyAxes: a horizontal spread is
  * x, a vertical column is y.
  */
-function collectAxisLabelLeaves(root: SceneItem, channel: Channel): BoundingBox[] {
+function collectAxisLabelLeaves(root: SceneItem,
+  channel: Channel,
+  inScope: (item: SceneItem) => boolean = () => true,
+  ): BoundingBox[] {
   const out: BoundingBox[] = [];
 
   const recordLeaves = (
@@ -156,16 +160,56 @@ function collectAxisLabelLeaves(root: SceneItem, channel: Channel): BoundingBox[
   const visit = (item: SceneItem, offsetX: number, offsetY: number): void => {
     if (item.role === 'axis-label' && item.bounds) {
       const groupChannel: Channel =
-        item.bounds.x2 - item.bounds.x1 >= item.bounds.y2 - item.bounds.y1
-          ? 'x'
-          : 'y';
-      if (groupChannel === channel) {
+        item.bounds.x2 - item.bounds.x1 >= item.bounds.y2 - item.bounds.y1 ? 'x' : 'y';
+      if (groupChannel === channel && inScope(item)) {
         const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
         const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
         item.items?.forEach((child) => recordLeaves(child, childX, childY));
       }
-      // Axis-label groups don't nest; stop here either way.
       return;
+    }
+    const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
+    const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
+    item.items?.forEach((child) => visit(child, childX, childY));
+  };
+
+  visit(root, 0, 0);
+  return out;
+}
+
+/**
+ * Locate axis-title boxes directly from `role: 'axis-title'` scene
+ * items, with optional structural scoping.
+ *
+ * Replaces the `identifyAxes`-based path for titles, which kept only
+ * one title per channel and so dropped the second x/y axis title in
+ * a vconcat. Walking directly for axis-title items returns ALL of
+ * them; the `inScope` predicate then filters by structural panel.
+ *
+ * Channel is read from the title's own rendered aspect ratio: x-axis
+ * titles are horizontal text and read as wider-than-tall; y-axis
+ * titles are rotated 90° and read as taller-than-wide.
+ */
+function collectAxisTitles(
+  root: SceneItem,
+  channel: Channel | null,
+  inScope: (item: SceneItem) => boolean = () => true,
+): BoundingBox[] {
+  const out: BoundingBox[] = [];
+
+  const visit = (item: SceneItem, offsetX: number, offsetY: number): void => {
+    if (item.role === 'axis-title' && item.bounds && inScope(item)) {
+      const b = item.bounds;
+      const box: BoundingBox = {
+        x: b.x1 + offsetX,
+        y: b.y1 + offsetY,
+        width: b.x2 - b.x1,
+        height: b.y2 - b.y1,
+      };
+      const titleChannel: Channel = box.width >= box.height ? 'x' : 'y';
+      if (channel === null || titleChannel === channel) {
+        out.push(box);
+      }
     }
     const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
     const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
@@ -183,75 +227,71 @@ function collectAxisLabelLeaves(root: SceneItem, channel: Channel): BoundingBox[
  * narrows to one axis; pass null to highlight all axes (e.g. a
  * config-level issue that applies to every axis).
  */
-export function locateTextElement(kind: TextElementKind, channel: Channel | null, root: SceneItem): BoundingBox[] {
+export function locateTextElement(
+  kind: TextElementKind,
+  channel: Channel | null,
+  root: SceneItem,
+  allowedGroups: Set<number> | null = null,
+): BoundingBox[] {
+  // Structural map is only worth computing when there's something to
+  // filter against. Without allowedGroups, every item is in scope.
+  const groupMap = allowedGroups ? computeStructuralMarkGroupMap(root) : null;
+  const inScope = (item: SceneItem): boolean => {
+    if (!groupMap || !allowedGroups) return true;
+    const g = groupMap.get(item);
+    // Items unmapped by the structural map are root-level globals
+    // (chart title etc.) — let them through; the resolver's choice of
+    // allowedGroups already restricts what's emitted at the spec side.
+    return g == null || allowedGroups.has(g);
+  };
+
   switch (kind) {
     case 'chart-title':
-      return collectAbsoluteBoxes(root, (item) => item.role === 'title');
+      return collectAbsoluteBoxes(root, (i) => i.role === 'title' && inScope(i));
 
     case 'legend-label':
-      return collectAbsoluteBoxes(root, (item) => item.role === 'legend-label');
+      return collectAbsoluteBoxes(root, (i) => i.role === 'legend-label' && inScope(i));
 
     case 'legend-title':
-      return collectAbsoluteBoxes(root, (item) => item.role === 'legend-title');
+      return collectAbsoluteBoxes(root, (i) => i.role === 'legend-title' && inScope(i));
 
-    case 'axis-label': {
-      if (channel) return collectAxisLabelLeaves(root, channel);
+    case 'axis-label':
+      if (channel) return collectAxisLabelLeaves(root, channel, inScope);
       return [
-        ...collectAxisLabelLeaves(root, 'x'),
-        ...collectAxisLabelLeaves(root, 'y'),
+        ...collectAxisLabelLeaves(root, 'x', inScope),
+        ...collectAxisLabelLeaves(root, 'y', inScope),
       ];
-    }
 
-    case 'axis-title': {
-      // Titles stay as one box per axis — a single rotated word has no
-      // sub-elements worth clustering.
-      const axes = identifyAxes(root);
-      if (channel) {
-        const box = axes[channel].title;
-        return box ? [box] : [];
-      }
-      return [axes.x.title, axes.y.title].filter(
-        (box): box is BoundingBox => box !== null,
-      );
-    }
-    }
+    case 'axis-title':
+      return collectAxisTitles(root, channel, inScope);
   }
+}
 
-  // ─── Text-mark placement (layer-scoped) ──────────────────────────
+  // ─── Text-mark placement ──────────────────────────
 
 /**
- * Locate the text glyphs belonging to one `mark: text` layer.
+ * Locate the text glyphs belonging to one or more `mark: text` groups.
  *
- * Text marks scope by LAYER (not by channel like axes do), so they
- * sit outside locateTextElement's (kind, channel) shape and get their
- * own function instead.
- *
- * Layer identification: Vega-Lite renders layers in spec order, one
- * `role: 'mark'` group per layer, so the Nth `role: 'mark'` group
- * encountered in DFS order corresponds to spec layer N. The group's
- * marktype must be 'text' for the issue to apply; if not, we return
- * empty (the pointer named a non-text-mark layer somehow — should not
- * happen in practice, but defensive).
- *
- * Pass `layerIndex = null` to cover EVERY text-mark glyph on the
- * chart. That's the right scope for config-source issues, whose
- * pointer is /config/text/fontSize and applies to all text marks at
- * once.
+ * Text marks scope by mark-group index — Vega-Lite renders text-mark
+ * units in spec DFS order, so the Nth `role: 'mark'` group with
+ * marktype 'text' is the unit at that DFS position. Pass the Set of
+ * allowed indices to restrict to specific units, or `null` to cover
+ * every text mark on the chart (the right scope for a config-source
+ * issue at /config/text/fontSize, which applies globally).
  *
  * Returns per-glyph boxes (no union) so the heatmap clusters them
  * into focused blobs over each label, mirroring colorScaleResolver's
  * use of collectDataMarkBoxes.
  *
- * Limitation: only top-level /layer/N/mark pointers are handled; a
- * nested-layer pointer like /layer/0/layer/2/mark would resolve the
- * wrong group. Adequate for the specs we've seen.
+ * Use `markGroupIndicesForIssue` from `viewScope.ts` to derive the
+ * Set from an issue's pointer.
  */
-export function locateTextMarkForLayer(
+export function locateTextMarksInGroups(
   root: SceneItem,
-  layerIndex: number | null,
+  allowedGroups: Set<number> | null,
 ): BoundingBox[] {
   const out: BoundingBox[] = [];
-  let markGroupCount = 0;
+  let groupIndex = 0;
 
   const visit = (
     item: SceneItem,
@@ -263,14 +303,13 @@ export function locateTextMarkForLayer(
 
     if (item.role === 'mark') {
       const isText = item.marktype === 'text';
-      const isTargetLayer =
-        layerIndex === null || markGroupCount === layerIndex;
-      markGroupCount++;
+      const isTargetGroup =
+        allowedGroups === null || allowedGroups.has(groupIndex);
+      groupIndex++;
 
-      // Skip the entire mark group if it isn't the layer we want, or
-      // if it isn't a text mark at all. Mark groups don't nest, so
-      // skipping descent here is safe.
-      if (!isText || !isTargetLayer) return;
+      // Skip the entire mark group if it isn't in scope or isn't a
+      // text mark. Mark groups don't nest, so skipping descent is safe.
+      if (!isText || !isTargetGroup) return;
       nextInside = true;
     }
 

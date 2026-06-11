@@ -404,85 +404,146 @@ function extractScalesFromEncoding(
     const channelDef = encoding[channel] as Record<string, unknown> | undefined;
     if (!channelDef || typeof channelDef !== 'object') continue;
 
-    const scale = channelDef.scale as Record<string, unknown> | undefined;
-    if (!scale || typeof scale !== 'object') continue;
+    // Direct: encoding.<channel> carries field/type/scale.
+    extractFromChannelDef(
+      spec,
+      channelDef,
+      `${pointer}/encoding/${channel}`,
+      channel,
+      results,
+    );
 
-    const scaleType = inferScaleType(channelDef);
-    // Resolved once and shared: continuous categorical schemes need it
-    // to sample the right number of colors, and discrete schemes / ranges
-    // need it to trim to the used count.
-    const categoryCount =
-      scaleType === 'categorical' ? resolveCategoryCount(spec, channelDef) : null;
-    const basePointer = `${pointer}/encoding/${channel}/scale`;
-
-    // ── Case 1: scale.range is a literal array of colors ──
-    if (Array.isArray(scale.range)) {
-      const colors = (scale.range as unknown[]).filter(
-        (c): c is string => typeof c === 'string',
+    // Conditional encodings: encoding.<channel>.condition can carry
+    // its OWN field/type/scale, and that's the scale Vega-Lite uses
+    // for matched items. With the very common click/brush pattern
+    // (default-empty selection ≡ "everything matches"), the
+    // condition's scale is what actually paints the marks — so a
+    // walker that ignores it misses contrast, CVD, lightness and
+    // uniformity issues for those charts entirely.
+    //
+    // Two shapes to handle: a single condition object, or an array
+    // of conditions (Vega-Lite allows both).
+    const condition = channelDef.condition;
+    if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
+      extractFromChannelDef(
+        spec,
+        condition as Record<string, unknown>,
+        `${pointer}/encoding/${channel}/condition`,
+        channel,
+        results,
       );
-      if (colors.length >= 2) {
-        const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
-        if (sliced.colors.length >= 2) {
-          results.push({
-            colors: sliced.colors,
-            scaleType,
-            jsonPointer: `${basePointer}/range`,
+    } else if (Array.isArray(condition)) {
+      condition.forEach((c, i) => {
+        if (c && typeof c === 'object') {
+          extractFromChannelDef(
+            spec,
+            c as Record<string, unknown>,
+            `${pointer}/encoding/${channel}/condition/${i}`,
             channel,
-            usedCategoryCount: sliced.usedCategoryCount,
-          });
+            results,
+          );
         }
-      }
-      continue; // range takes priority over scheme
+      });
     }
+  }
+}
 
-    // ── Case 2: scale.scheme is a string ──
-    if (typeof scale.scheme === 'string') {
-      const colors = resolveNamedScheme(scale.scheme, {scaleType, categoryCount});
-      if (colors && colors.length >= 2) {
-        const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
-        if (sliced.colors.length >= 2) {
-          results.push({
-            colors: sliced.colors,
-            scaleType,
-            jsonPointer: `${basePointer}/scheme`,
-            channel,
-            schemeName: scale.scheme,
-            usedCategoryCount: sliced.usedCategoryCount,
-          });
-        }
+/**
+ * Extract a scale from one channelDef-shaped object — either the
+ * channel itself or a `condition` block, both of which can carry
+ * the same trio of `field` / `type` / `scale` properties.
+ *
+ * `baseChannelPointer` is the pointer at which the object lives in
+ * the spec (e.g. `/encoding/color` or `/encoding/color/condition`);
+ * the produced `jsonPointer` extends it with `/scale/range` or
+ * `/scale/scheme` as appropriate.
+ *
+ * Mirrors the three-case structure the previous inline version used
+ * (literal range; named scheme string; scheme object). Factored out
+ * so the direct and conditional paths share one implementation.
+ */
+function extractFromChannelDef(
+  spec: Record<string, unknown>,
+  channelDef: Record<string, unknown>,
+  baseChannelPointer: string,
+  channel: string,
+  results: ResolvedScale[],
+): void {
+  const scale = channelDef.scale as Record<string, unknown> | undefined;
+  if (!scale || typeof scale !== 'object') return;
+
+  const scaleType = inferScaleType(channelDef);
+  const categoryCount =
+    scaleType === 'categorical' ? resolveCategoryCount(spec, channelDef) : null;
+  const basePointer = `${baseChannelPointer}/scale`;
+
+  // ── Case 1: scale.range is a literal array of colors ──
+  if (Array.isArray(scale.range)) {
+    const colors = (scale.range as unknown[]).filter(
+      (c): c is string => typeof c === 'string',
+    );
+    if (colors.length >= 2) {
+      const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
+      if (sliced.colors.length >= 2) {
+        results.push({
+          colors: sliced.colors,
+          scaleType,
+          jsonPointer: `${basePointer}/range`,
+          channel,
+          usedCategoryCount: sliced.usedCategoryCount,
+        });
       }
-      continue;
     }
+    return; // range takes priority over scheme
+  }
 
-    // ── Case 3: scale.scheme is an object { name, count?, extent? } ──
-    if (
-      scale.scheme &&
-      typeof scale.scheme === 'object' &&
-      !Array.isArray(scale.scheme)
-    ) {
-      const schemeObj = scale.scheme as Record<string, unknown>;
-      const name = schemeObj.name;
-      if (typeof name !== 'string') continue;
+  // ── Case 2: scale.scheme is a string ──
+  if (typeof scale.scheme === 'string') {
+    const colors = resolveNamedScheme(scale.scheme, {scaleType, categoryCount});
+    if (colors && colors.length >= 2) {
+      const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
+      if (sliced.colors.length >= 2) {
+        results.push({
+          colors: sliced.colors,
+          scaleType,
+          jsonPointer: `${basePointer}/scheme`,
+          channel,
+          schemeName: scale.scheme,
+          usedCategoryCount: sliced.usedCategoryCount,
+        });
+      }
+    }
+    return;
+  }
 
-      const count = typeof schemeObj.count === 'number' ? schemeObj.count : undefined;
-      const extent =
-        Array.isArray(schemeObj.extent) && schemeObj.extent.length === 2
-          ? (schemeObj.extent as [number, number])
-          : undefined;
+  // ── Case 3: scale.scheme is an object { name, count?, extent? } ──
+  if (
+    scale.scheme &&
+    typeof scale.scheme === 'object' &&
+    !Array.isArray(scale.scheme)
+  ) {
+    const schemeObj = scale.scheme as Record<string, unknown>;
+    const name = schemeObj.name;
+    if (typeof name !== 'string') return;
 
-      const colors = resolveNamedScheme(name, {scaleType, categoryCount, count, extent});
-      if (colors && colors.length >= 2) {
-        const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
-        if (sliced.colors.length >= 2) {
-          results.push({
-            colors: sliced.colors,
-            scaleType,
-            jsonPointer: `${basePointer}/scheme`,
-            channel,
-            schemeName: name,
-            usedCategoryCount: sliced.usedCategoryCount,
-          });
-        }
+    const count = typeof schemeObj.count === 'number' ? schemeObj.count : undefined;
+    const extent =
+      Array.isArray(schemeObj.extent) && schemeObj.extent.length === 2
+        ? (schemeObj.extent as [number, number])
+        : undefined;
+
+    const colors = resolveNamedScheme(name, {scaleType, categoryCount, count, extent});
+    if (colors && colors.length >= 2) {
+      const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
+      if (sliced.colors.length >= 2) {
+        results.push({
+          colors: sliced.colors,
+          scaleType,
+          jsonPointer: `${basePointer}/scheme`,
+          channel,
+          schemeName: name,
+          usedCategoryCount: sliced.usedCategoryCount,
+        });
       }
     }
   }

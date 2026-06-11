@@ -184,6 +184,30 @@ function buildSuggestion(markType: string | null, channel: string): string {
   );
 }
 
+/**
+ * The channel-def-shaped object that actually carries field/type for
+ * this colour encoding. Vega-Lite allows the categorical field and
+ * type to live inside a `condition` block — the `color.condition`
+ * branch is exactly where things like the brush/click pattern put
+ * them — while `color` itself only carries the fallback `value`.
+ * Without this resolution the rule misses every chart using that
+ * pattern, because `channelDef.field` is undefined.
+ *
+ * The direct channel wins when it carries its own field; the
+ * condition is only consulted as a fallback. Same precedence pattern
+ * we use in resolveScaleColors' extractFromChannelDef split.
+ */
+function effectiveColorChannelDef(channelDef: Record<string, any>): Record<string, any> {
+  if (resolveFieldName(channelDef)) return channelDef;
+  const cond = channelDef.condition;
+  if (cond && typeof cond === 'object' && !Array.isArray(cond)) {
+    return cond as Record<string, any>;
+  }
+  return channelDef;
+}
+
+
+
 // ─── Spec walker ─────────────────────────────────────────────────
 
 /**
@@ -208,9 +232,10 @@ function checkNodeEncoding(
     const channelDef = encoding[channel];
     if (!channelDef || typeof channelDef !== 'object') continue;
 
-    const fieldName = resolveFieldName(channelDef);
+    const effective = effectiveColorChannelDef(channelDef);
+    const fieldName = resolveFieldName(effective);
     if (!fieldName) continue;
-    if (!isCategoricalType(channelDef)) continue;
+    if (!isCategoricalType(effective)) continue;
 
     // Redundancy can come from the SAME encoding block (shape,
     // strokeDash, position…) OR from a SIBLING layer (e.g. a text
@@ -223,7 +248,7 @@ function checkNodeEncoding(
       results.push({
         channel,
         fieldName,
-        fieldType: channelDef.type,
+        fieldType: effective.type,
         jsonPointer: `${pointer}/encoding/${channel}`,
         markType,
       });

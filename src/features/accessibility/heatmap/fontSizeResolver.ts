@@ -19,20 +19,14 @@
 import type {AccessibilityIssue} from '../types.js';
 import type {BoundingBox} from './boundingBox.js';
 import type {IssueResolver, ResolverContext} from './resolvers.js';
-import {channelFromLabel, channelFromPointer, locateTextElement, locateTextMarkForLayer, type TextElementKind} from './textElements.js';
+import {channelFromLabel, channelFromPointer, locateTextElement, locateTextMarksInGroups, type TextElementKind} from './textElements.js';
+import {markGroupIndicesForIssue} from './viewScope.js';
 
 /** Section of a configKey: "axis.labelFontSize" → "axis". */
 function configSection(configKey: unknown): string {
   return typeof configKey === 'string' ? configKey.split('.')[0] : '';
 }
 
-/** Extract N from a /layer/N/... pointer. Returns null when there is
- * no layer prefix — e.g. for a config-source issue at
- * /config/text/fontSize, which applies to every text mark at once. */
-function topLayerIndexFromPointer(pointer: string): number | null {
-  const match = /^\/layer\/(\d+)(?:\/|$)/.exec(pointer ?? '');
-  return match ? Number(match[1]) : null;
-}
 
 /** Map fontSize evidence (config section + label/title role) to a text-element kind. */
 function kindFromEvidence(section: string, isTitle: boolean): TextElementKind | null {
@@ -42,27 +36,21 @@ function kindFromEvidence(section: string, isTitle: boolean): TextElementKind | 
   return null;
 }
 
-export const fontSizeResolver: IssueResolver = (issue: AccessibilityIssue, ctx: ResolverContext): BoundingBox[] => {
+export const fontSizeResolver: IssueResolver = (issue, ctx) => {
   const evidence = (issue.evidence ?? {}) as Record<string, unknown>;
   const section = configSection(evidence.configKey);
+  const allowedGroups = markGroupIndicesForIssue(issue.jsonPointer, ctx.spec);
 
-  // Text marks scope by LAYER (e.g. /layer/2/mark), not by channel —
-  // dispatch them to their own locator. Config-source issues carry no
-  // layer in their pointer; layerIndex = null then covers every text
-  // mark, which matches the global scope of a config-level fix.
   if (section === 'text') {
-    const layerIndex = topLayerIndexFromPointer(issue.jsonPointer);
-    return locateTextMarkForLayer(ctx.scenegraphRoot, layerIndex);
+    return locateTextMarksInGroups(ctx.scenegraphRoot, allowedGroups);
   }
 
   const kind = kindFromEvidence(section, evidence.role === 'title');
   if (!kind) return [];
 
-  // Prefer the channel named in the pointer; fall back to the label for
-  // config-level issues whose pointer has no channel in it.
   const channel =
     channelFromPointer(issue.jsonPointer) ??
     channelFromLabel(typeof evidence.element === 'string' ? evidence.element : '');
 
-  return locateTextElement(kind, channel, ctx.scenegraphRoot);
+  return locateTextElement(kind, channel, ctx.scenegraphRoot, allowedGroups);
 };

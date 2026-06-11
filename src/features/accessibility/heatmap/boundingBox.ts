@@ -147,51 +147,51 @@ const TEXT_MARKTYPES = new Set(['text']);
  * individual data mark — the symbols, rects, lines etc. that Vega
  * draws to represent the data.
  *
- * ... (existing doc comment) ...
+ * Pass `allowedGroups` to restrict collection to specific mark
+ * groups, indexed in DFS order (so the Nth `role: 'mark'` group
+ * encountered is index N). Layers map 1-to-1 to mark groups, so a
+ * layer-only scope is a one-element Set. `vconcat` / `hconcat` /
+ * `concat` panels with several layers contribute several indices.
+ * Pass `null` (the default) to collect every mark group — that
+ * matches the top-level / single-unit case and rules whose scope is
+ * global.
  *
- * Pass `layerIndex` to scope to one layer's mark group only. Layers
- * map 1-to-1 to `role: 'mark'` groups in DFS order (Vega-Lite renders
- * layers in spec order), so the Nth mark group is layer N. Pass null
- * (the default) to collect every layer's marks — that matches the
- * top-level / single-unit case and rules whose scope is global.
+ * Use `markGroupIndicesForIssue` from `viewScope.ts` to derive the
+ * Set from an issue's pointer.
  */
 export function collectDataMarkBoxes(
   root: SceneItem,
-  layerIndex: number | null = null,
+  allowedGroups: Set<number> | null = null,
 ): BoundingBox[] {
   const out: BoundingBox[] = [];
-  let markGroupCount = 0;
+  let groupIndex = 0;
 
   const visit = (item: SceneItem, offsetX: number, offsetY: number, insideMarkGroup: boolean) => {
-    if (item.role === 'mark') {
-      // Count BEFORE any branching: every mark group must advance the
-      // counter, including text marks and other-layer groups we skip
-      // below. Otherwise layer N would map to the wrong scenegraph
-      // group on specs with mixed marktypes across layers.
-      const groupLayerIndex = markGroupCount;
-      markGroupCount++;
+  if (item.role === 'mark') {
+    const b = item.bounds;
+    const hasBounds = !!b && b.x2 > b.x1 && b.y2 > b.y1;
 
-      // Text mark groups belong to the text branch of the heatmap —
-      // never to non-text contrast or any colour-scale rule.
-      if (item.marktype && TEXT_MARKTYPES.has(item.marktype)) {
-        return;
-      }
+    // Skip mark groups with no real bounds (synthetic groups Vega
+    // emits for selection params). They contain no data marks anyway,
+    // and counting them would shift the index for the real ones.
+    if (!hasBounds) return;
 
-      // Layer scoping: drop other layers' mark groups when a target
-      // layer was named. Skips e.g. a black tick layer when only the
-      // sibling circle layer carries the failing colour.
-      if (layerIndex !== null && groupLayerIndex !== layerIndex) {
-        return;
-      }
+    const thisGroup = groupIndex;
+    groupIndex++;
 
-      // Spread marktypes: record the mark group's own bounds as one
-      // box and stop descending. Per-leaf is the wrong granularity.
-      if (item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
-        const b = item.bounds;
-        out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
-        return;
-      }
+    if (item.marktype && TEXT_MARKTYPES.has(item.marktype)) {
+      return;
     }
+
+    if (allowedGroups !== null && !allowedGroups.has(thisGroup)) {
+      return;
+    }
+
+    if (item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
+      out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
+      return;
+    }
+  }
 
     // Discrete marktypes: record each leaf scene item inside the mark group.
     const isLeaf = !item.items || item.items.length === 0;

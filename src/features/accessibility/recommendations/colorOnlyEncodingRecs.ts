@@ -35,7 +35,7 @@
  */
 
 import type {AccessibilityIssue} from '../types.js';
-import type {Recommendation} from './types.js';
+import type {Recommendation, VegaLiteSpec} from './types.js';
 import {setEncodingChannel, convertMarkToPoint, parentPointer, addTextLabelLayer} from './specMutators.js';
 import {resolveBackground} from '../rules/contrastAnalysis.js';
 import {pickTextColorFor} from './contrastAdjust.js';
@@ -149,15 +149,120 @@ function buildAddChannel(args: {
       const evidence = readColorOnlyEvidence(issue);
       if (!evidence) return spec;
 
-      return setEncodingChannel(spec, encodingPointerFor(issue), args.channel, {
-        field: evidence.fieldName,
-        // Pass the field type through faithfully (nominal / ordinal)
-        // rather than forcing nominal, so the redundant channel stays
-        // true to how the data is actually typed.
-        type: evidence.fieldType,
-      });
-    },
+      return setEncodingChannel(
+        spec,
+        encodingPointerFor(issue),
+        args.channel,
+        buildRedundantChannelDef(
+          spec,
+          encodingPointerFor(issue),
+          evidence.channel,
+          evidence.fieldName,
+          evidence.fieldType,
+        ),
+      );
+}
   };
+}
+
+/**
+ * Walk to one channel's definition in the spec.
+ *
+ * Used to inspect the SOURCE colour encoding so the redundant
+ * channel we add can mirror its structure (see
+ * `buildRedundantChannelDef`).
+ */
+function readChannelDef(
+  spec: unknown,
+  encodingPointer: string,
+  channel: string,
+): Record<string, any> | null {
+  const segments = encodingPointer.split('/').filter(Boolean);
+  let node: any = spec;
+  for (const seg of segments) {
+    if (node == null || typeof node !== 'object') return null;
+    node = node[seg];
+  }
+  const channelDef = node && typeof node === 'object' ? node[channel] : null;
+  return channelDef && typeof channelDef === 'object' ? channelDef : null;
+}
+
+/**
+ * Build the channel-def for the new redundant channel
+ * (shape / strokeDash), shaped to match how the SOURCE colour
+ * encoding references its field.
+ *
+ * Why this matters: Vega-Lite merges legends across encodings that
+ * share the same (field, type). It tracks an encoding's field by
+ * looking BOTH at the channel level and inside `condition` — but
+ * legend merging keys off structural depth. A `{condition.field}`
+ * colour encoding paired with a `{field}` shape encoding doesn't
+ * merge, so a "redundancy" fix ends up producing TWO legends for
+ * one categorical field instead of one combined legend.
+ *
+ * Mirror solution:
+ *   - colour has field at channel level    → shape gets {field, type}
+ *   - colour has field inside a condition  → shape mirrors the
+ *     condition shape: same predicate (param/test/not/empty), same
+ *     field/type, and scale.domain copied across to keep category
+ *     order consistent (range is intentionally dropped — shape /
+ *     strokeDash don't use a colour range).
+ */
+function buildRedundantChannelDef(
+  spec: VegaLiteSpec,
+  encodingPointer: string,
+  sourceChannel: string,
+  fieldName: string,
+  fieldType: string,
+): Record<string, unknown> {
+  const sourceDef = readChannelDef(spec, encodingPointer, sourceChannel);
+
+  // Direct: source's field at channel level. Mirror flatly.
+  if (sourceDef && typeof sourceDef.field === 'string') {
+    return {field: fieldName, type: fieldType};
+  }
+
+  // Conditional: source's field lives inside a single condition object.
+  const cond = sourceDef?.condition;
+  if (
+    cond &&
+    typeof cond === 'object' &&
+    !Array.isArray(cond) &&
+    typeof (cond as Record<string, any>).field === 'string'
+  ) {
+    const condObj = cond as Record<string, any>;
+    const mirrored: Record<string, unknown> = {
+      field: fieldName,
+      type: fieldType,
+    };
+
+    // Copy predicate keys so the new channel fires under the same
+    // condition as the source.
+    for (const key of ['param', 'test', 'not', 'selection', 'empty'] as const) {
+      if (key in condObj) mirrored[key] = condObj[key];
+    }
+
+    // Carry over scale.domain so categories sort the same way on
+    // both legends — required for a clean merge. Skip scale.range:
+    // shape / strokeDash don't render a colour range.
+    if (
+      condObj.scale &&
+      typeof condObj.scale === 'object' &&
+      !Array.isArray(condObj.scale)
+    ) {
+      const sourceScale = condObj.scale as Record<string, any>;
+      if (sourceScale.domain) {
+        mirrored.scale = {domain: sourceScale.domain};
+      }
+    }
+
+    return {condition: mirrored};
+  }
+
+  // Anything we don't recognise (e.g. array of conditions) — keep
+  // the simple flat shape. The user will see two legends in that
+  // edge case, but the fix still satisfies WCAG 1.4.1.
+  return {field: fieldName, type: fieldType};
 }
 
 // ─── Recommendations ─────────────────────────────────────────────
@@ -191,21 +296,25 @@ export const addShapeEncoding: Recommendation = {
     const evidence = readColorOnlyEvidence(issue);
     if (!evidence) return spec;
 
-    // Add the shape channel for the same field.
-    let next = setEncodingChannel(spec, encodingPointerFor(issue), 'shape', {
-      field: evidence.fieldName,
-      type: evidence.fieldType,
-    });
+    let next = setEncodingChannel(
+      spec,
+      encodingPointerFor(issue),
+      'shape',
+      buildRedundantChannelDef(
+        spec,
+        encodingPointerFor(issue),
+        evidence.channel,
+        evidence.fieldName,
+        evidence.fieldType,
+      ),
+    );
 
-    // circle / square ignore the shape channel — convert to point so
-    // the shapes actually render. point already renders shapes, so it
-    // needs no conversion.
     if (evidence.markType === 'circle' || evidence.markType === 'square') {
       next = convertMarkToPoint(next, markPointerFor(issue));
     }
 
     return next;
-  },
+  }
 };
 
 export const addStrokeDashEncoding = buildAddChannel({
