@@ -54,6 +54,24 @@ export interface SceneItem {
   [key: string]: unknown;
 }
 
+/**
+ * Return a box expanded by `padding` scene units on every side.
+ *
+ * Used by clustering to merge nearby-but-not-overlapping mark boxes
+ * into one cluster — so a dense scatterplot reads as one blob per
+ * region rather than as one blob per dot. The original boxes are
+ * still what unionBounds operates on, so the drawn blobs sit on the
+ * actual marks; inflation only affects the overlap test.
+ */
+export function inflateBox(box: BoundingBox, padding: number): BoundingBox {
+  return {
+    x: box.x - padding,
+    y: box.y - padding,
+    width: box.width + 2 * padding,
+    height: box.height + 2 * padding,
+  };
+}
+
 /** Convert one scene item's (already-absolute) bounds into a BoundingBox. */
 export function boundsFromSceneItem(item: SceneItem): BoundingBox | null {
   const b = item.bounds;

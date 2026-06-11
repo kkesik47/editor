@@ -56,11 +56,17 @@ export const LABEL_FONT_SIZE_THRESHOLD = 13;
 
 // ─── Vega-Lite default font sizes (pixels) ───────────────────────
 
+//   Defaults from Vega's `style` block (axis/legend resolve through it):
+//   style['guide-label']  fontSize 10  → axis labels, legend labels
+//   style['guide-title']  fontSize 11  → axis titles, legend titles
+//   style['group-title']  fontSize 13  → chart title
+//   mark.text             fontSize 11  → text marks
+// https://github.com/vega/vega/blob/main/packages/vega-parser/src/config.js
 const DEFAULT_TITLE_FONT_SIZE = 13;
 const DEFAULT_AXIS_LABEL_FONT_SIZE = 10;
-const DEFAULT_AXIS_TITLE_FONT_SIZE = 10;
+const DEFAULT_AXIS_TITLE_FONT_SIZE = 11;   // was 10
 const DEFAULT_LEGEND_LABEL_FONT_SIZE = 10;
-const DEFAULT_LEGEND_TITLE_FONT_SIZE = 10;
+const DEFAULT_LEGEND_TITLE_FONT_SIZE = 11; // was 10
 const DEFAULT_TEXT_MARK_FONT_SIZE = 11;
 
 // ─── Types ───────────────────────────────────────────────────────

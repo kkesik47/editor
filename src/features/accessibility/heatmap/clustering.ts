@@ -23,20 +23,43 @@
 
 import type {AccessibilityIssue} from '../types.js';
 import type {BoundingBox} from './boundingBox.js';
-import {unionBounds} from './boundingBox.js';
-import type {IssueRegion} from './resolvers.js';
+import {unionBounds, inflateBox} from './boundingBox.js';
+import type {IssueRegion, RegionKind} from './resolvers.js';
+
+/**
+ * Scene-space padding applied to MARK regions before the overlap
+ * test during clustering. Adjacent marks (neighbouring scatter
+ * points, sibling bars) then merge into one cluster instead of each
+ * becoming its own tiny blob with its own badge. Text regions don't
+ * inflate — labels and titles must stay distinct or the badge sits
+ * between them and the chart reads as "everything is one issue".
+ */
+const MARK_CLUSTER_PADDING = 10;
 
 export type Severity = 'warning' | 'info';
 
 export interface IssueCluster {
-  /** Union of all member boxes — where the blob is drawn. */
+  /** Union of all member boxes — used to place the badge. */
   box: BoundingBox;
+  /**
+   * Individual member boxes after deduplication. One blob is drawn
+   * per box, so dense scatters render as a string of overlapping
+   * halos and bar rows render as one blob per bar, while the cluster
+   * still carries a single badge sitting at `box`'s top-right.
+   */
+  memberBoxes: BoundingBox[];
   /** The distinct issues represented here (deduped by key). */
   issues: AccessibilityIssue[];
   /** Their keys, for coordinating hover with the editor and pane. */
   keys: string[];
   /** Worst severity among members — drives the blob colour. */
   severity: Severity;
+  /**
+   * Whether this cluster paints marks or text. Drives inflation
+   * during clustering (marks inflate, text doesn't) and paint order
+   * during rendering (text paints on top of marks).
+   */
+  kind: RegionKind;
   /** How many distinct issues — drives blob intensity and the badge. */
   count: number;
 }
@@ -59,6 +82,14 @@ function overlaps(a: BoundingBox, b: BoundingBox, minFraction = 0.15): boolean {
 /** Pick the more serious of two severities (warning beats info). */
 function worse(a: Severity, b: Severity): Severity {
   return a === 'warning' || b === 'warning' ? 'warning' : 'info';
+}
+
+/** Inflate mark regions before the overlap test so adjacent marks
+ *  merge; leave text regions untouched. */
+function clusterBoxOf(region: IssueRegion): BoundingBox {
+  return region.kind === 'mark'
+    ? inflateBox(region.box, MARK_CLUSTER_PADDING)
+    : region.box;
 }
 
 /**
@@ -95,8 +126,9 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
     const group = groups.find(
       (members) =>
         members[0].issue.severity === region.issue.severity &&
-        members.some((m) => overlaps(m.box, region.box)),
-      );
+        members[0].kind === region.kind &&
+        members.some((m) => overlaps(clusterBoxOf(m), clusterBoxOf(region))),
+    );
     if (group) {
       group.push(region);
     } else {
@@ -105,43 +137,60 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
   }
 
   return groups.map((members) => {
-    // Order members so the cluster's primary issue (keys[0]) reflects
-    // what the user actually sees on the marks — see pointerPriority.
     const sorted = [...members].sort(
       (a, b) => pointerPriority(a.issue.jsonPointer) - pointerPriority(b.issue.jsonPointer),
     );
 
     const box = unionBounds(sorted.map((m) => m.box))!;
 
-    const byKey = new Map<string, AccessibilityIssue>();
+    // Dedup member boxes by rounded coordinates. Two rules firing on
+    // the same scale (e.g. colourblind-safety + colour-only) produce
+    // identical mark boxes; rendering two ellipses on the exact same
+    // coordinates doubles the apparent fill opacity.
+    const seenBox = new Set<string>();
+    const memberBoxes: BoundingBox[] = [];
     for (const m of sorted) {
-      byKey.set(m.key, m.issue);
+      const k = `${Math.round(m.box.x)},${Math.round(m.box.y)},${Math.round(m.box.width)},${Math.round(m.box.height)}`;
+      if (seenBox.has(k)) continue;
+      seenBox.add(k);
+      memberBoxes.push(m.box);
     }
+
+    const byKey = new Map<string, AccessibilityIssue>();
+    for (const m of sorted) byKey.set(m.key, m.issue);
 
     const keys = [...byKey.keys()];
     const severity = (sorted[0].issue.severity === 'warning' ? 'warning' : 'info') as Severity;
-    return {box, issues: [...byKey.values()], keys, severity, count: keys.length};
+    const kind = sorted[0].kind;
+
+    return {box, memberBoxes, issues: [...byKey.values()], keys, severity, kind, count: keys.length};
   });
 }
 
 /**
- * Warnings take visual precedence over suggestions. Where a warning
- * blob and a suggestion blob land on the same spot, drawing both
- * (transparent fills) muddies them into grey. So we hide any
- * suggestion cluster a warning cluster already covers: the user sees
- * the orange (warning) blob, and once the warning is fixed the
- * suggestion is no longer covered and its blue blob appears.
+ * Warnings take visual precedence over suggestions OF THE SAME KIND.
+ * Where a mark-warning and a mark-suggestion land on the same spot,
+ * drawing both muddies them into grey — so the mark-suggestion is
+ * hidden. A text-suggestion on a label paints something different
+ * from the mark blob underneath and shouldn't be hidden by it, so
+ * we restrict the suppression to same-kind warnings.
  *
- * Also returns clusters in paint order — suggestions first, warnings
- * last — so warnings render on top (SVG paints in document order).
+ * Returns clusters in paint order: marks first, then text on top.
+ * Within each kind, suggestions paint before warnings so warnings
+ * stay visible; text on top keeps tight label/title blobs from
+ * being washed out by mark-warning halos bleeding into them.
  */
 export function orderByPrecedence(clusters: IssueCluster[]): IssueCluster[] {
   const warnings = clusters.filter((c) => c.severity === 'warning');
   const suggestions = clusters.filter((c) => c.severity === 'info');
 
   const visibleSuggestions = suggestions.filter(
-    (s) => !warnings.some((w) => overlaps(s.box, w.box)),
+    (s) => !warnings.some((w) => w.kind === s.kind && overlaps(s.box, w.box)),
   );
 
-  return [...visibleSuggestions, ...warnings];
+  const all = [...visibleSuggestions, ...warnings];
+  return [
+    ...all.filter((c) => c.kind === 'mark'),
+    ...all.filter((c) => c.kind === 'text'),
+  ];
 }

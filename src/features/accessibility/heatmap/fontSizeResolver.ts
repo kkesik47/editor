@@ -42,15 +42,22 @@ export const fontSizeResolver: IssueResolver = (issue, ctx) => {
   const allowedGroups = markGroupIndicesForIssue(issue.jsonPointer, ctx.spec);
 
   if (section === 'text') {
-    return locateTextMarksInGroups(ctx.scenegraphRoot, allowedGroups);
+    return {
+      kind: 'text',
+      boxes: locateTextMarksInGroups(ctx.scenegraphRoot, allowedGroups),
+    };
   }
 
-  const kind = kindFromEvidence(section, evidence.role === 'title');
-  if (!kind) return [];
+  // Renamed local to avoid shadowing the new `kind` field on ResolvedRegion.
+  const elementKind = kindFromEvidence(section, evidence.role === 'title');
+  if (!elementKind) return {kind: 'text', boxes: []};
 
   const channel =
     channelFromPointer(issue.jsonPointer) ??
     channelFromLabel(typeof evidence.element === 'string' ? evidence.element : '');
 
-  return locateTextElement(kind, channel, ctx.scenegraphRoot, allowedGroups);
+  return {
+    kind: 'text',
+    boxes: locateTextElement(elementKind, channel, ctx.scenegraphRoot, allowedGroups),
+  };
 };

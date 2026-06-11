@@ -138,7 +138,7 @@ function isConditionalValueFallback(
 
 export const colorScaleResolver: IssueResolver = (issue, ctx) => {
   if (isConditionalValueFallback(issue.jsonPointer, ctx.spec)) {
-    return [];
+    return {kind: 'mark', boxes: []};
   }
 
   const root = ctx.scenegraphRoot;
@@ -150,7 +150,7 @@ export const colorScaleResolver: IssueResolver = (issue, ctx) => {
     legendBoxes = clipBoxesToMarkGroups(legendBoxes, allowedGroups, collectMarkGroupBounds(root));
   }
 
-  return [...marks, ...legendBoxes];
+  return {kind: 'mark', boxes: [...marks, ...legendBoxes]};
 };
 
 /**
@@ -179,10 +179,13 @@ export const contrastResolver: IssueResolver = (issue, ctx) => {
   }
 
   const label = typeof evidence.elementLabel === 'string' ? evidence.elementLabel : '';
-  const kind = kindFromContrastLabel(label);
-  if (!kind) return [];
+  const elementKind = kindFromContrastLabel(label);
+  if (!elementKind) return {kind: 'text', boxes: []};
 
   const channel = channelFromPointer(issue.jsonPointer) ?? channelFromLabel(label);
   const allowedGroups = markGroupIndicesForIssue(issue.jsonPointer, ctx.spec);
-  return locateTextElement(kind, channel, ctx.scenegraphRoot, allowedGroups);
+  return {
+    kind: 'text',
+    boxes: locateTextElement(elementKind, channel, ctx.scenegraphRoot, allowedGroups),
+  };
 };

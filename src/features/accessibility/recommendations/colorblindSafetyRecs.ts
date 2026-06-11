@@ -125,6 +125,39 @@ const WONG: string[] = [
   '#D55E00', // vermillion
 ];
 
+/**
+ * Maximum number of categories at which each Vega-registered categorical
+ * scheme stays CVD-safe under the rule's own ΔE 5 threshold across all
+ * three dichromacy types.
+ *
+ * Empirically derived (probe-categorical-limits.mjs, run against
+ * culori's Machado 2009 simulators at severity 1.0):
+ *
+ *   tableau10    → safe up to 7 categories; protanopia ΔE falls to 3.86 at k=8
+ *   dark2        → safe up to 6 categories; deuteranopia ΔE falls to 2.71 at k=7
+ *   observable10 → safe up to 5 categories; deuteranopia drops to 0.62 at k=6
+ *   set2         → safe up to 3 categories; protanopia ΔE falls to 2.39 at k=4
+ *
+ * We gate each scheme's recommendation on `usedCategoryCount <= limit`
+ * so that applying the swap actually clears the warning rather than
+ * triggering it again under the same simulation.
+ *
+ * When `usedCategoryCount` is null (data loaded from a URL, no explicit
+ * domain), we err on the side of NOT recommending — same as set2's
+ * original behaviour.
+ */
+const CATEGORICAL_SAFE_LIMITS: Record<string, number> = {
+  tableau10:    7,
+  dark2:        6,
+  observable10: 5,
+  set2:         3,
+};
+
+function isUnderSafeLimit(schemeName: string, usedCategoryCount: number | null): boolean {
+  if (usedCategoryCount == null) return false;
+  return usedCategoryCount <= CATEGORICAL_SAFE_LIMITS[schemeName];
+}
+
 // ─── Helper factories ───────────────────────────────────────────
 
 /**
@@ -274,60 +307,50 @@ export const swapToTableau10 = buildSchemeSwap({
   description:
     "Tableau's standard categorical palette. Designed for strong " +
     'discriminability under simulated color vision deficiencies. ' +
-    'Good neutral default for most categorical encodings.',
+    'Stays CVD-safe up to about seven categories.',
   schemeName: 'tableau10',
-  applies: (evidence) => evidence.scaleType === 'categorical',
+  applies: (evidence) =>
+    evidence.scaleType === 'categorical' &&
+    isUnderSafeLimit('tableau10', evidence.usedCategoryCount),
 });
-
-/**
- * Maximum number of categories at which set2 stays CVD-safe.
- *
- * set2 is a muted ColorBrewer palette that is safe at low category
- * counts but develops a protanopia-confusable pair once five or more
- * of its colours are in play. We only offer it when the data uses few
- * enough categories that it won't simply re-trigger the same warning.
- * Past this count, the guaranteed-safe palettes (Okabe-Ito, Wong) and
- * the more robust schemes (tableau10, dark2, observable10) are better
- * recommendations.
- */
-const SET2_SAFE_CATEGORY_LIMIT = 4;
 
 export const swapToSet2 = buildSchemeSwap({
   id: 'cvd-swap-to-set2',
   label: 'Switch to set2',
   description:
-    'Muted ColorBrewer categorical palette, CVD-safe up to about four ' +
-    'categories. Best when the original design was non-vibrant and a ' +
-    'softer palette fits the visual tone.',
+    'Muted ColorBrewer categorical palette. Stays CVD-safe up to about ' +
+    'three categories; past that, protanopia collapses one pair. Best ' +
+    'when the original design was non-vibrant and a softer palette fits.',
   schemeName: 'set2',
   applies: (evidence) =>
     evidence.scaleType === 'categorical' &&
-    // Only offer set2 when we know the count is small enough for it to
-    // be safe. When the count is unknown (e.g. data from a URL), we err
-    // on the side of NOT recommending it, since it would often re-fail.
-    evidence.usedCategoryCount != null &&
-    evidence.usedCategoryCount <= SET2_SAFE_CATEGORY_LIMIT,
+    isUnderSafeLimit('set2', evidence.usedCategoryCount),
 });
 
 export const swapToDark2 = buildSchemeSwap({
   id: 'cvd-swap-to-dark2',
   label: 'Switch to dark2',
   description:
-    'Higher-saturation ColorBrewer categorical palette. Best when the ' +
-    'original design was vibrant and you want to keep strong color ' +
-    'separation between categories.',
+    'Higher-saturation ColorBrewer categorical palette. Stays CVD-safe ' +
+    'up to about six categories. Best when the original design was ' +
+    'vibrant and you want to keep strong colour separation.',
   schemeName: 'dark2',
-  applies: (evidence) => evidence.scaleType === 'categorical',
+  applies: (evidence) =>
+    evidence.scaleType === 'categorical' &&
+    isUnderSafeLimit('dark2', evidence.usedCategoryCount),
 });
 
 export const swapToObservable10 = buildSchemeSwap({
   id: 'cvd-swap-to-observable10',
   label: 'Switch to observable10',
   description:
-    "Observable's default categorical palette. Modern, well-balanced " +
-    'between vibrancy and discriminability under CVD.',
+    "Observable's default categorical palette. Stays CVD-safe up to " +
+    'about five categories; deuteranopia collapses two colours at six. ' +
+    'Modern, well-balanced between vibrancy and discriminability.',
   schemeName: 'observable10',
-  applies: (evidence) => evidence.scaleType === 'categorical',
+  applies: (evidence) =>
+    evidence.scaleType === 'categorical' &&
+    isUnderSafeLimit('observable10', evidence.usedCategoryCount),
 });
 
 export const swapToOkabeIto = buildRangeSwap({

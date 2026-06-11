@@ -30,7 +30,7 @@
 import * as React from 'react';
 import {useLayoutEffect, useRef, useState} from 'react';
 import {useAppContext} from '../../context/app-context.js';
-import type {SceneItem} from '../../features/accessibility/heatmap/boundingBox.js';
+import type {BoundingBox, SceneItem} from '../../features/accessibility/heatmap/boundingBox.js';
 import {resolveIssueRegions, type IssueRegion} from '../../features/accessibility/heatmap/resolvers.js';
 import {clusterRegions, orderByPrecedence} from '../../features/accessibility/heatmap/clustering.js';
 import './index.css';
@@ -47,6 +47,36 @@ interface OverlayGeometry {
   sceneMinY: number;
   sceneWidth: number;
   sceneHeight: number;
+}
+
+/**
+ * Above this many member boxes, drawing one ellipse per member would
+ * stack into fully-opaque orange at the centre (SVG alpha composites
+ * as 1 − (1 − a)^N, which saturates to 1 fast). Switch to a single
+ * soft blob over the cluster's union box instead. Tuned to keep
+ * disaster-style rows (~30–80 members) in per-member mode for the
+ * "follow the data shape" look, while catching very dense scatters
+ * before they go opaque.
+ */
+const LARGE_CLUSTER_THRESHOLD = 100;
+
+/**
+ * Pick the cluster member with the greatest area. The badge anchors
+ * to this box's top-right corner so it sits ON a visible mark rather
+ * than at the union's top-right, which for sparse rows often lands
+ * in empty space above the rightmost dot.
+ */
+function largestMemberBox(boxes: BoundingBox[]): BoundingBox {
+  let best = boxes[0];
+  let bestArea = best.width * best.height;
+  for (let i = 1; i < boxes.length; i++) {
+    const a = boxes[i].width * boxes[i].height;
+    if (a > bestArea) {
+      best = boxes[i];
+      bestArea = a;
+    }
+  }
+  return best;
 }
 
 /** Find the actual <svg>/<canvas> Vega drew inside its container. */
@@ -217,24 +247,16 @@ export default function AccessibilityHeatmap() {
           </radialGradient>
         </defs>
 
-        {clusters.map((cluster, i) => {
-          const cx = cluster.box.x + cluster.box.width / 2;
-          const cy = cluster.box.y + cluster.box.height / 2;
-          // Slightly larger than the element so the glow bleeds beyond
-          // it, like heat — and so thin elements (a single label row)
-          // still read as a full blob rather than a faint sliver.
-          const rx = cluster.box.width / 2 + 10;
-          const ry = cluster.box.height / 2 + 10;
+        {clusters.map((cluster, ci) => {
+          // Beyond the threshold, per-member rendering composites to fully
+          // opaque and hides the data underneath. Fall back to one big
+          // blob over the cluster's box so dense scatters stay readable.
+          const useSingleBlob = cluster.memberBoxes.length > LARGE_CLUSTER_THRESHOLD;
+          const blobs = useSingleBlob ? [cluster.box] : cluster.memberBoxes;
+
           return (
-            <ellipse
-              key={i}
-              className={`a11y-blob a11y-blob-${cluster.severity}`}
-              cx={cx}
-              cy={cy}
-              rx={rx}
-              ry={ry}
-              fill={`url(#a11y-blob-${cluster.severity})`}
-              opacity={blobOpacity(cluster.count)}
+            <g
+              key={ci}
               onMouseEnter={() => setHover([cluster.keys[0]])}
               onMouseLeave={() => setHover([])}
               onClick={() => setState((s) => ({
@@ -244,7 +266,23 @@ export default function AccessibilityHeatmap() {
                 debugPane: true,
                 focusedIssueKey: cluster.keys[0],
               }))}
-            />
+            >
+              {blobs.map((b, bi) => {
+                const cx = b.x + b.width / 2;
+                const cy = b.y + b.height / 2;
+                const rx = b.width / 2 + 10;
+                const ry = b.height / 2 + 10;
+                return (
+                  <ellipse
+                    key={bi}
+                    className={`a11y-blob a11y-blob-${cluster.severity}`}
+                    cx={cx} cy={cy} rx={rx} ry={ry}
+                    fill={`url(#a11y-blob-${cluster.severity})`}
+                    opacity={blobOpacity(cluster.count)}
+                  />
+                );
+              })}
+            </g>
           );
         })}
       </svg>
@@ -253,7 +291,10 @@ export default function AccessibilityHeatmap() {
           cluster. Non-interactive so the blob beneath still takes hover. */}
       {clusters.map((cluster, i) => {
         if (cluster.count < 2) return null;
-        const corner = sceneToPixel(cluster.box.x + cluster.box.width, cluster.box.y);
+        // Anchor to the largest member's top-right so the badge sits on a
+        // visible mark, not in the empty space above a sparse row.
+        const anchor = largestMemberBox(cluster.memberBoxes);
+        const corner = sceneToPixel(anchor.x + anchor.width, anchor.y);
         return (
           <span
             key={i}

@@ -43,22 +43,43 @@ export interface ResolverContext {
 }
 
 /**
- * A resolver answers one question: "where on the chart does this
- * issue live?" It returns zero or more boxes. Zero means it could not
- * confidently locate the issue, in which case the overlay draws
- * nothing rather than guessing at the wrong place.
+ * Kind of region: 'mark' for data marks and legend symbols (visual
+ * marks); 'text' for axis/legend/title labels and titles. Drives
+ * clustering — marks inflate before the overlap test so dense
+ * scatters merge into regional blobs; text stays tight so labels
+ * and titles never bleed into one another.
  */
-export type IssueResolver = (issue: AccessibilityIssue, ctx: ResolverContext) => BoundingBox[];
+export type RegionKind = 'mark' | 'text';
 
 /**
- * One drawable region: the box, the issue it came from (so the overlay
- * can colour it by `issue.severity`), and a stable `key` identifying
- * that issue across the chart / editor / pane for hover coordination.
+ * A resolver's answer: which kind of element it located, and the
+ * boxes themselves. All boxes from one resolver call share a kind
+ * (a single issue concerns either marks or text, never both).
+ */
+export interface ResolvedRegion {
+  kind: RegionKind;
+  boxes: BoundingBox[];
+}
+
+/**
+ * A resolver answers one question: "where on the chart does this
+ * issue live?" It returns the kind of element it targeted plus
+ * zero or more boxes. Zero boxes means it could not confidently
+ * locate the issue, in which case the overlay draws nothing rather
+ * than guessing at the wrong place.
+ */
+export type IssueResolver = (issue: AccessibilityIssue, ctx: ResolverContext) => ResolvedRegion;
+
+/**
+ * One drawable region: the box, the issue it came from, a stable
+ * `key` for cross-surface coordination, and the region kind so
+ * clustering can treat marks and text differently.
  */
 export interface IssueRegion {
   issue: AccessibilityIssue;
   box: BoundingBox;
   key: string;
+  kind: RegionKind;
 }
 
 // ─── Registry ────────────────────────────────────────────────────
@@ -113,8 +134,9 @@ export function resolveIssueRegions(issues: AccessibilityIssue[], ctx: ResolverC
     if (!resolver) return;
 
     const key = issueKey(issue, index);
-    for (const box of resolver(issue, ctx)) {
-      regions.push({issue, box, key});
+    const {kind, boxes} = resolver(issue, ctx);
+    for (const box of boxes) {
+      regions.push({issue, box, key, kind});
     }
   });
 

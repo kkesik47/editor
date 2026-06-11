@@ -20,7 +20,11 @@
  * What this rule does NOT check:
  *   - Perceptual uniformity / equidistance (separate concern, separate rule)
  *   - SVG / rendered pixel analysis (spec-level only)
- *   - Default Vega-Lite schemes (only explicit author-defined scales)
+ * 
+ * What this rule DOES check:
+ *   - Explicit colour scales (scale.range / scale.scheme)
+ *   - Implicit default schemes that Vega-Lite picks when no scale
+ *     is written, including config.range.* overrides
  */
 
 import type {AccessibilityIssue, AccessibilityRule} from '../types.js';
@@ -141,6 +145,7 @@ function buildIssues(
             'or "cividis", or increase the lightness range of your scale.',
 
       jsonPointer: scale.jsonPointer,
+      editorVisibility: scale.isImplicit ? 'underline-key' : 'underline',
 
       evidence: {
         cvdType: result.cvdType,

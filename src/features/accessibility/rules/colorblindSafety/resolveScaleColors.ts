@@ -1,15 +1,19 @@
 /**
  * resolveScaleColors.ts
  *
- * Walks a Vega-Lite specification to find explicit color scales
- * (encoding.color.scale, encoding.fill.scale, encoding.stroke.scale),
- * then resolves each scale to a concrete array of CSS color strings.
+ * Walks a Vega-Lite specification to find color scales — both
+ * EXPLICIT (where the author has set encoding.<channel>.scale) and
+ * IMPLICIT (where no scale is written and Vega-Lite falls back to a
+ * default scheme based on field type and mark type). For each
+ * scale, resolves a concrete array of CSS colour strings.
  *
- * Handles three specification forms:
+ * Handles four specification forms:
  *   1. scale.range  — a literal array of color strings
  *   2. scale.scheme — a string naming a Vega/D3 color scheme
  *   3. scale.scheme — an object { name, count?, extent? }
- *
+ *   4. No explicit colours — synthesise the Vega-Lite default
+ *      (e.g. nominal → tableau10, quant+rect → viridis); authors
+ *      can override these via config.range.*
  * Continuous/sequential schemes are sampled at evenly-spaced points.
  * The `count` and `extent` parameters are respected when present.
  *
@@ -69,6 +73,13 @@ export interface ResolvedScale {
    * couldn't determine the count and kept the full scheme.
    */
   usedCategoryCount?: number;
+  /**
+   * True when the scale was synthesised from Vega-Lite's default
+   * because no scale block was written. Affects editor underline
+   * (no value to highlight, so the channel key is underlined
+   * instead — see colorblindSafetyRule.buildIssues).
+   */
+  isImplicit?: boolean;
 }
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -296,6 +307,96 @@ function resolveCategoryCount(
   return seen.size > 0 ? seen.size : null;
 }
 
+// ─── Implicit-default scheme synthesis ───────────────────────────
+
+/**
+ * Vega-Lite's default colour schemes, keyed by the `config.range.*`
+ * sub-property that selects them. Authors who omit `scale.scheme` and
+ * `scale.range` get these palettes:
+ *
+ *   nominal field                      → range.category  → tableau10
+ *   ordinal field                      → range.ordinal   → blues
+ *   quant / temporal on `rect` mark    → range.heatmap   → viridis
+ *   quant / temporal on other marks    → range.ramp      → blues
+ *   diverging signals (see below)      → range.diverging → blueorange
+ *
+ * Diverging signals are the same ones inferScaleType already uses:
+ * scale.type === 'diverging', a 3-element domain, scale.domainMid, or
+ * a known diverging scheme name.
+ *
+ * Source: vega/packages/vega-parser/src/config.js (the `range` block),
+ * with Vega-Lite's heatmap override documented at
+ * vega-lite/docs/scale.html#default-color.
+ */
+const IMPLICIT_DEFAULT_SCHEMES = {
+  category:  'tableau10',
+  ordinal:   'blues',
+  ramp:      'blues',
+  heatmap:   'viridis',
+  diverging: 'blueorange',
+} as const;
+
+type RangeKey = keyof typeof IMPLICIT_DEFAULT_SCHEMES;
+
+/** Pick which `range.*` key applies, or null if no default is appropriate. */
+function pickRangeKey(
+  channelDef: Record<string, unknown>,
+  markType: string | null,
+  scaleType: ScaleType,
+): RangeKey | null {
+  if ('value' in channelDef) return null;          // {value: "#f00"} → no scale
+  const fieldType = channelDef.type;
+  if (typeof fieldType !== 'string') return null;  // can't infer without a type
+
+  if (scaleType === 'diverging') return 'diverging';
+  if (fieldType === 'nominal')   return 'category';
+  if (fieldType === 'ordinal')   return 'ordinal';
+  if (fieldType === 'quantitative' || fieldType === 'temporal') {
+    return markType === 'rect' ? 'heatmap' : 'ramp';
+  }
+  return null;
+}
+
+/**
+ * Resolve the implicit default scheme name for a channel with no
+ * explicit colours. Honours `config.range.<key>` overrides before
+ * falling back to the hardcoded Vega-Lite mapping.
+ */
+function synthesizeImplicitScheme(
+  spec: Record<string, unknown>,
+  channelDef: Record<string, unknown>,
+  markType: string | null,
+  scaleType: ScaleType,
+): string | null {
+  const key = pickRangeKey(channelDef, markType, scaleType);
+  if (key == null) return null;
+
+  // 1. Author override in config.range.<key> (either a string scheme
+  //    name or an object form like { scheme: "set2" }).
+  const configRange = (spec.config as Record<string, unknown> | undefined)
+    ?.range as Record<string, unknown> | undefined;
+  const override = configRange?.[key];
+  if (typeof override === 'string') return override;
+  if (override && typeof override === 'object' && !Array.isArray(override)) {
+    const name = (override as Record<string, unknown>).scheme;
+    if (typeof name === 'string') return name;
+  }
+
+  // 2. Hardcoded Vega-Lite default.
+  return IMPLICIT_DEFAULT_SCHEMES[key];
+}
+
+/** Resolve a node's mark type from shorthand or object form. */
+function resolveMarkType(node: Record<string, unknown>): string | null {
+  const mark = node?.mark;
+  if (typeof mark === 'string') return mark;
+  if (mark && typeof mark === 'object' && !Array.isArray(mark)) {
+    const t = (mark as Record<string, unknown>).type;
+    if (typeof t === 'string') return t;
+  }
+  return null;
+}
+
 // ─── Scale type inference ────────────────────────────────────────
 
 function inferScaleType(encodingDef: Record<string, unknown>): ScaleType {
@@ -400,47 +501,34 @@ function extractScalesFromEncoding(
   const encoding = node?.encoding as Record<string, unknown> | undefined;
   if (!encoding || typeof encoding !== 'object') return;
 
+  // markType is needed to pick between range.heatmap (rect) and
+  // range.ramp (other marks) when the author hasn't set a scheme.
+  const markType = resolveMarkType(node);
+
   for (const channel of COLOR_CHANNELS) {
     const channelDef = encoding[channel] as Record<string, unknown> | undefined;
     if (!channelDef || typeof channelDef !== 'object') continue;
 
-    // Direct: encoding.<channel> carries field/type/scale.
     extractFromChannelDef(
-      spec,
-      channelDef,
+      spec, channelDef,
       `${pointer}/encoding/${channel}`,
-      channel,
-      results,
+      channel, markType, results,
     );
 
-    // Conditional encodings: encoding.<channel>.condition can carry
-    // its OWN field/type/scale, and that's the scale Vega-Lite uses
-    // for matched items. With the very common click/brush pattern
-    // (default-empty selection ≡ "everything matches"), the
-    // condition's scale is what actually paints the marks — so a
-    // walker that ignores it misses contrast, CVD, lightness and
-    // uniformity issues for those charts entirely.
-    //
-    // Two shapes to handle: a single condition object, or an array
-    // of conditions (Vega-Lite allows both).
     const condition = channelDef.condition;
     if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
       extractFromChannelDef(
-        spec,
-        condition as Record<string, unknown>,
+        spec, condition as Record<string, unknown>,
         `${pointer}/encoding/${channel}/condition`,
-        channel,
-        results,
+        channel, markType, results,
       );
     } else if (Array.isArray(condition)) {
       condition.forEach((c, i) => {
         if (c && typeof c === 'object') {
           extractFromChannelDef(
-            spec,
-            c as Record<string, unknown>,
+            spec, c as Record<string, unknown>,
             `${pointer}/encoding/${channel}/condition/${i}`,
-            channel,
-            results,
+            channel, markType, results,
           );
         }
       });
@@ -467,18 +555,18 @@ function extractFromChannelDef(
   channelDef: Record<string, unknown>,
   baseChannelPointer: string,
   channel: string,
+  markType: string | null,
   results: ResolvedScale[],
 ): void {
-  const scale = channelDef.scale as Record<string, unknown> | undefined;
-  if (!scale || typeof scale !== 'object') return;
-
   const scaleType = inferScaleType(channelDef);
   const categoryCount =
     scaleType === 'categorical' ? resolveCategoryCount(spec, channelDef) : null;
+
+  const scale = channelDef.scale as Record<string, unknown> | undefined;
   const basePointer = `${baseChannelPointer}/scale`;
 
   // ── Case 1: scale.range is a literal array of colors ──
-  if (Array.isArray(scale.range)) {
+  if (scale && Array.isArray(scale.range)) {
     const colors = (scale.range as unknown[]).filter(
       (c): c is string => typeof c === 'string',
     );
@@ -494,11 +582,11 @@ function extractFromChannelDef(
         });
       }
     }
-    return; // range takes priority over scheme
+    return;
   }
 
   // ── Case 2: scale.scheme is a string ──
-  if (typeof scale.scheme === 'string') {
+  if (scale && typeof scale.scheme === 'string') {
     const colors = resolveNamedScheme(scale.scheme, {scaleType, categoryCount});
     if (colors && colors.length >= 2) {
       const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
@@ -518,9 +606,8 @@ function extractFromChannelDef(
 
   // ── Case 3: scale.scheme is an object { name, count?, extent? } ──
   if (
-    scale.scheme &&
-    typeof scale.scheme === 'object' &&
-    !Array.isArray(scale.scheme)
+    scale && scale.scheme &&
+    typeof scale.scheme === 'object' && !Array.isArray(scale.scheme)
   ) {
     const schemeObj = scale.scheme as Record<string, unknown>;
     const name = schemeObj.name;
@@ -543,6 +630,36 @@ function extractFromChannelDef(
           channel,
           schemeName: name,
           usedCategoryCount: sliced.usedCategoryCount,
+        });
+      }
+    }
+    return;
+  }
+
+  // ── Case 4: no explicit colours — synthesise Vega-Lite's default ──
+  //
+  // Without this branch the rule would skip every chart whose colour
+  // channel relies on the implicit default scheme — the most common
+  // case in the wild. The default is looked up from `config.range.<key>`
+  // when the author has overridden it, otherwise from the hardcoded
+  // Vega-Lite mapping in IMPLICIT_DEFAULT_SCHEMES above.
+  //
+  // The pointer is the channel itself (no `/scale` suffix) — there is
+  // no scale block to underline; the issue surfaces on the channel key.
+  const implicitName = synthesizeImplicitScheme(spec, channelDef, markType, scaleType);
+  if (implicitName) {
+    const colors = resolveNamedScheme(implicitName, {scaleType, categoryCount});
+    if (colors && colors.length >= 2) {
+      const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
+      if (sliced.colors.length >= 2) {
+        results.push({
+          colors: sliced.colors,
+          scaleType,
+          jsonPointer: `${baseChannelPointer}/scale/scheme`,
+          channel,
+          schemeName: implicitName,
+          usedCategoryCount: sliced.usedCategoryCount,
+          isImplicit: true,
         });
       }
     }
