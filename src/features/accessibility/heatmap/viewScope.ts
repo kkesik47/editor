@@ -7,7 +7,7 @@
  * Why this exists: heatmap resolvers used to handle only `/layer/N/`
  * scoping. A vconcat / hconcat / concat issue at
  * `/vconcat/0/encoding/...` carried no `/layer/` prefix, so the
- * resolver fell back to "no filter" — painting every panel's marks
+ * resolver fell back to "no filter" - painting every panel's marks
  * instead of just the one the issue belongs to.
  *
  * The trick: Vega-Lite emits mark groups into the scenegraph in DFS
@@ -24,7 +24,7 @@
  * contains layers.
  */
 
-import type {BoundingBox, SceneItem}  from './boundingBox.js';
+import type {BoundingBox, SceneItem} from './boundingBox.js';
 
 /** A single step in a composition path. */
 export type ViewPathStep =
@@ -80,7 +80,7 @@ export function extractViewPath(pointer: string): ViewPathStep[] {
       continue;
     }
 
-    // First non-composition segment — encoding / mark / config / …
+    // First non-composition segment - encoding / mark / config / …
     break;
   }
 
@@ -108,13 +108,10 @@ function pathStartsWith(path: ViewPathStep[], prefix: ViewPathStep[]): boolean {
  * Every unit with a `mark` property counts, including text marks.
  * That matches `collectDataMarkBoxes`, which increments its
  * mark-group counter for every encountered group before deciding
- * whether to skip text ones — keeping spec-side and scenegraph-side
+ * whether to skip text ones - keeping spec-side and scenegraph-side
  * counters in lockstep.
  */
-export function markGroupIndicesForViewPath(
-  spec: Record<string, unknown>,
-  target: ViewPathStep[],
-): Set<number> {
+export function markGroupIndicesForViewPath(spec: Record<string, unknown>, target: ViewPathStep[]): Set<number> {
   const out = new Set<number>();
   let counter = 0;
 
@@ -133,16 +130,12 @@ export function markGroupIndicesForViewPath(
 
     // Container: descend into its children with the path extended.
     if (Array.isArray(obj.layer)) {
-      obj.layer.forEach((child, i) =>
-        walk(child, [...currentPath, {type: 'layer', index: i}]),
-      );
+      obj.layer.forEach((child, i) => walk(child, [...currentPath, {type: 'layer', index: i}]));
     }
     for (const key of ['vconcat', 'hconcat', 'concat'] as const) {
       const arr = obj[key];
       if (Array.isArray(arr)) {
-        arr.forEach((child, i) =>
-          walk(child, [...currentPath, {type: key, index: i}]),
-        );
+        arr.forEach((child, i) => walk(child, [...currentPath, {type: key, index: i}]));
       }
     }
     if (obj.spec) {
@@ -163,10 +156,7 @@ export function markGroupIndicesForViewPath(
  * means "every mark group", matching the no-filter semantics of the
  * downstream walkers and keeping top-level specs working untouched.
  */
-export function markGroupIndicesForIssue(
-  pointer: string,
-  spec: Record<string, unknown>,
-): Set<number> | null {
+export function markGroupIndicesForIssue(pointer: string, spec: Record<string, unknown>): Set<number> | null {
   const path = extractViewPath(pointer);
   if (path.length === 0) return null;
   return markGroupIndicesForViewPath(spec, path);
@@ -181,7 +171,7 @@ export function markGroupIndicesForIssue(
  * selection `params` (e.g. an interval brush) into their own scene
  * mark groups that occupy zero-by-zero rectangles. Counting those
  * would shift every subsequent index and break the spec→scenegraph
- * mapping — see the [a11y debug] output where /vconcat/1 should
+ * mapping - see the [a11y debug] output where /vconcat/1 should
  * resolve to mark group 3 (the bars) but the spec walker labels it 1
  * because the spec doesn't know about the synthetic selection marks.
  *
@@ -233,7 +223,7 @@ function distancePointToRect(px: number, py: number, rect: BoundingBox): number 
  * closest edge of each mark-group rectangle (zero when inside). Axis
  * labels sit immediately outside their own panel's mark group, so
  * they score ~0 against that panel and a clearly larger positive
- * distance against every other panel — even when another panel
+ * distance against every other panel - even when another panel
  * happens to be more vertically/horizontally central overall.
  *
  * Layered panels share a coord system, so their mark groups overlap;
@@ -263,33 +253,31 @@ export function clipBoxesToMarkGroups(
         nearestIndex = index;
       }
     }
-    
+
     return nearestIndex !== -1 && allowedGroups.has(nearestIndex);
   });
 }
 
 /**
  * For each scene item, find the index of the mark group it shares
- * the deepest ancestry with — i.e. which panel of a concat
+ * the deepest ancestry with - i.e. which panel of a concat
  * composition it sits inside structurally.
  *
  * Why structural rather than geometric: an x-axis title in a vconcat
  * sits below one panel's plot and above the next, so geometric
  * "nearest edge" can misattribute it. Its ANCESTRY, however,
- * unambiguously names the panel — the title shares
+ * unambiguously names the panel - the title shares
  * root → panel-0 → axis with panel 0's mark group, but only root
  * with panel 1's.
  *
  * Index matches `markGroupIndicesForViewPath` and
- * `collectMarkGroupBounds` — the Nth bounded `role: 'mark'` group in
+ * `collectMarkGroupBounds` - the Nth bounded `role: 'mark'` group in
  * DFS order. Items tied between marks at the deepest depth are left
  * UNMAPPED, which is the signature of a global element like the
  * chart title; a filter using this map can treat "not in map" as
  * "not panel-scoped" and let it through.
  */
-export function computeStructuralMarkGroupMap(
-  root: SceneItem,
-): Map<SceneItem, number> {
+export function computeStructuralMarkGroupMap(root: SceneItem): Map<SceneItem, number> {
   const out = new Map<SceneItem, number>();
   const marks: Array<{index: number; chain: SceneItem[]}> = [];
   let count = 0;

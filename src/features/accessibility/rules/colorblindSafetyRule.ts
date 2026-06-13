@@ -11,16 +11,16 @@
  * actually distinguish the colors in this specific scale?"
  *
  * Architecture:
- *   1. resolveScaleColors  — find scales in the spec, resolve to color arrays,
+ *   1. resolveScaleColors  - find scales in the spec, resolve to color arrays,
  *                            and slice categorical scales to the actual
  *                            number of categories used by the data
- *   2. evaluateColorblindSafety — simulate CVD, measure distinguishability
- *   3. this file            — orchestrate and produce AccessibilityIssue objects
+ *   2. evaluateColorblindSafety - simulate CVD, measure distinguishability
+ *   3. this file            - orchestrate and produce AccessibilityIssue objects
  *
  * What this rule does NOT check:
  *   - Perceptual uniformity / equidistance (separate concern, separate rule)
  *   - SVG / rendered pixel analysis (spec-level only)
- * 
+ *
  * What this rule DOES check:
  *   - Explicit colour scales (scale.range / scale.scheme)
  *   - Implicit default schemes that Vega-Lite picks when no scale
@@ -35,14 +35,8 @@ import {
   CATEGORICAL_THRESHOLD,
   SEQUENTIAL_DISTANT_THRESHOLD,
 } from './colorblindSafety/cvdSimulation.js';
-import { debugCvdDeltaE } from './colorblindSafety/cvdSimulation.js';
-import {
-  MACHADO_2009,
-  SHARMA_CIEDE_2005,
-  BIRCH_2012,
-  NUNEZ_2018,
-  SMITH_VAN_DER_WALT_2015,
-} from '../references.js';
+import {debugCvdDeltaE} from './colorblindSafety/cvdSimulation.js';
+import {MACHADO_2009, SHARMA_CIEDE_2005, BIRCH_2012, NUNEZ_2018, SMITH_VAN_DER_WALT_2015} from '../references.js';
 
 // ─── Trusted sequential schemes ──────────────────────────────────
 
@@ -62,13 +56,7 @@ import {
  * from these schemes are an off-label use and still go through the full
  * pairwise check.
  */
-const CVD_SAFE_SEQUENTIAL_SCHEMES = new Set<string>([
-  'viridis',
-  'plasma',
-  'inferno',
-  'magma',
-  'cividis',
-]);
+const CVD_SAFE_SEQUENTIAL_SCHEMES = new Set<string>(['viridis', 'plasma', 'inferno', 'magma', 'cividis']);
 
 function isPublishedCvdSafe(scale: ResolvedScale): boolean {
   return (
@@ -98,25 +86,14 @@ const CVD_LABELS: Record<string, string> = {
  *   - `usedCategoryCount` (categorical scales only) so recommendations
  *     applying explicit palettes can slice them to the right length
  */
-function buildIssues(
-  scale: ResolvedScale,
-  cvdResults: CvdTestResult[],
-): AccessibilityIssue[] {
+function buildIssues(scale: ResolvedScale, cvdResults: CvdTestResult[]): AccessibilityIssue[] {
   return cvdResults.map((result) => {
     const label = CVD_LABELS[result.cvdType] ?? result.cvdType;
-    const threshold =
-      scale.scaleType === 'categorical'
-        ? CATEGORICAL_THRESHOLD
-        : SEQUENTIAL_DISTANT_THRESHOLD;
+    const threshold = scale.scaleType === 'categorical' ? CATEGORICAL_THRESHOLD : SEQUENTIAL_DISTANT_THRESHOLD;
 
-    const schemeNote = scale.schemeName
-      ? ` (scheme '${scale.schemeName}')`
-      : '';
+    const schemeNote = scale.schemeName ? ` (scheme '${scale.schemeName}')` : '';
 
-    const pairKind =
-      scale.scaleType === 'categorical'
-        ? 'color pairs'
-        : 'distant data values';
+    const pairKind = scale.scaleType === 'categorical' ? 'color pairs' : 'distant data values';
 
     // Describe severity based on how close the colors became
     let impact: string;
@@ -139,8 +116,7 @@ function buildIssues(
 
       suggestion:
         scale.scaleType === 'categorical'
-          ? 'Consider a colorblind-safe categorical palette, or add ' +
-            'redundant encodings such as shape or pattern.'
+          ? 'Consider a colorblind-safe categorical palette, or add ' + 'redundant encodings such as shape or pattern.'
           : 'Consider a CVD-safe sequential scheme such as "viridis" ' +
             'or "cividis", or increase the lightness range of your scale.',
 
@@ -195,7 +171,7 @@ export const colorblindSafetyRule: AccessibilityRule = {
     const issues: AccessibilityIssue[] = [];
 
     for (const scale of scales) {
-      // Trust published CVD-safe sequential schemes by name — see
+      // Trust published CVD-safe sequential schemes by name - see
       // CVD_SAFE_SEQUENTIAL_SCHEMES above for the literature backing.
       if (isPublishedCvdSafe(scale)) continue;
 

@@ -13,7 +13,7 @@
  *
  *   A scene item's `bounds` are NOT absolute. They are relative to the
  *   coordinate origin of the group that contains it. Groups carry an
- *   (x, y) translate — e.g. the x-axis group is pushed down by the plot
+ *   (x, y) translate - e.g. the x-axis group is pushed down by the plot
  *   height, the title group is pushed up. So an x-axis label may report
  *   bounds at y=7 while actually sitting at y=307 because its group is
  *   translated down by 300.
@@ -58,7 +58,7 @@ export interface SceneItem {
  * Return a box expanded by `padding` scene units on every side.
  *
  * Used by clustering to merge nearby-but-not-overlapping mark boxes
- * into one cluster — so a dense scatterplot reads as one blob per
+ * into one cluster - so a dense scatterplot reads as one blob per
  * region rather than as one blob per dot. The original boxes are
  * still what unionBounds operates on, so the drawn blobs sit on the
  * actual marks; inflation only affects the overlap test.
@@ -132,13 +132,13 @@ export function collectAbsoluteBoxes(root: SceneItem, accept: (item: SceneItem) 
 
 /**
  * Walk the scenegraph and return the absolute bounding box of each
- * individual data mark — the symbols, rects, lines etc. that Vega
+ * individual data mark - the symbols, rects, lines etc. that Vega
  * draws to represent the data.
  *
  * Why this needs a separate walker from collectAbsoluteBoxes: a
  * `role: 'mark'` scene item is the GROUP that wraps the data marks,
  * and its bounds span the whole plot area. Using those bounds gives
- * an overlay that always covers the entire plot — for three sparse
+ * an overlay that always covers the entire plot - for three sparse
  * scatter points, the bounding rectangle is the whole chart. We want
  * one box per actual mark, so blobs sit on the marks themselves and
  * clustering merges nearby ones.
@@ -153,7 +153,7 @@ export function collectAbsoluteBoxes(root: SceneItem, accept: (item: SceneItem) 
  * don't cluster cleanly with their neighbours. */
 const SPREAD_MARKTYPES = new Set(['line', 'area', 'trail', 'arc']);
 
-/** Marktypes that render glyphs — they belong to the TEXT branch of
+/** Marktypes that render glyphs - they belong to the TEXT branch of
  * the heatmap (text contrast / font size), never to non-text contrast
  * or any colour-scale rule. Skipping them here keeps colour-scale
  * resolvers from painting orange over chart labels like axis-value
@@ -162,7 +162,7 @@ const TEXT_MARKTYPES = new Set(['text']);
 
 /**
  * Walk the scenegraph and return the absolute bounding box of each
- * individual data mark — the symbols, rects, lines etc. that Vega
+ * individual data mark - the symbols, rects, lines etc. that Vega
  * draws to represent the data.
  *
  * Pass `allowedGroups` to restrict collection to specific mark
@@ -170,46 +170,43 @@ const TEXT_MARKTYPES = new Set(['text']);
  * encountered is index N). Layers map 1-to-1 to mark groups, so a
  * layer-only scope is a one-element Set. `vconcat` / `hconcat` /
  * `concat` panels with several layers contribute several indices.
- * Pass `null` (the default) to collect every mark group — that
+ * Pass `null` (the default) to collect every mark group - that
  * matches the top-level / single-unit case and rules whose scope is
  * global.
  *
  * Use `markGroupIndicesForIssue` from `viewScope.ts` to derive the
  * Set from an issue's pointer.
  */
-export function collectDataMarkBoxes(
-  root: SceneItem,
-  allowedGroups: Set<number> | null = null,
-): BoundingBox[] {
+export function collectDataMarkBoxes(root: SceneItem, allowedGroups: Set<number> | null = null): BoundingBox[] {
   const out: BoundingBox[] = [];
   let groupIndex = 0;
 
   const visit = (item: SceneItem, offsetX: number, offsetY: number, insideMarkGroup: boolean) => {
-  if (item.role === 'mark') {
-    const b = item.bounds;
-    const hasBounds = !!b && b.x2 > b.x1 && b.y2 > b.y1;
+    if (item.role === 'mark') {
+      const b = item.bounds;
+      const hasBounds = !!b && b.x2 > b.x1 && b.y2 > b.y1;
 
-    // Skip mark groups with no real bounds (synthetic groups Vega
-    // emits for selection params). They contain no data marks anyway,
-    // and counting them would shift the index for the real ones.
-    if (!hasBounds) return;
+      // Skip mark groups with no real bounds (synthetic groups Vega
+      // emits for selection params). They contain no data marks anyway,
+      // and counting them would shift the index for the real ones.
+      if (!hasBounds) return;
 
-    const thisGroup = groupIndex;
-    groupIndex++;
+      const thisGroup = groupIndex;
+      groupIndex++;
 
-    if (item.marktype && TEXT_MARKTYPES.has(item.marktype)) {
-      return;
+      if (item.marktype && TEXT_MARKTYPES.has(item.marktype)) {
+        return;
+      }
+
+      if (allowedGroups !== null && !allowedGroups.has(thisGroup)) {
+        return;
+      }
+
+      if (item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
+        out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
+        return;
+      }
     }
-
-    if (allowedGroups !== null && !allowedGroups.has(thisGroup)) {
-      return;
-    }
-
-    if (item.marktype && SPREAD_MARKTYPES.has(item.marktype) && item.bounds) {
-      out.push({x: b.x1 + offsetX, y: b.y1 + offsetY, width: b.x2 - b.x1, height: b.y2 - b.y1});
-      return;
-    }
-  }
 
     // Discrete marktypes: record each leaf scene item inside the mark group.
     const isLeaf = !item.items || item.items.length === 0;

@@ -16,7 +16,7 @@
  *      Given a set of failing foreground colours, return the
  *      background extreme (white or near-black) that maximises the
  *      MINIMUM contrast ratio across them. Used by "Change
- *      background". This is the corrected picker — earlier versions
+ *      background". This is the corrected picker - earlier versions
  *      snapped based on the current background's theme, which got
  *      dark-on-dark cases exactly backwards.
  *
@@ -62,7 +62,7 @@ const RATIO_MARGIN = 0.1;
 /** Step size, in OKLCH L units, used while searching. */
 const L_STEP = 0.02;
 
-/** Safety cap on the number of steps — guards against runaway loops. */
+/** Safety cap on the number of steps - guards against runaway loops. */
 const MAX_STEPS = 60;
 
 const toOklch = converter('oklch');
@@ -95,24 +95,20 @@ function nudgeDirection(fg: string, bg: string): -1 | 1 {
  * Adjust a foreground color along the OKLCH lightness axis until its
  * contrast ratio against the given background reaches `targetRatio`
  * (plus a small margin). Hue and chroma are preserved, so the color's
- * identity is kept as much as possible — only its lightness changes.
+ * identity is kept as much as possible - only its lightness changes.
  *
  * OKLCH (Björn Ottosson, 2020) is used rather than CIELAB because
  * its lightness axis is more perceptually uniform for hue-preserving
- * lightness changes — exactly the operation we want here.
+ * lightness changes - exactly the operation we want here.
  *
  * Returns null in degenerate cases:
  *   - foreground or background cannot be parsed
  *   - the search hits L = 0 or L = 1 and still doesn't clear the
  *     target (e.g. foreground was already near pure black/white
- *     against a similarly-toned background — no nudge can save it,
+ *     against a similarly-toned background - no nudge can save it,
  *     the user needs a different rec).
  */
-export function adjustForegroundUntilRatio(
-  foreground: string,
-  background: string,
-  targetRatio: number,
-): string | null {
+export function adjustForegroundUntilRatio(foreground: string, background: string, targetRatio: number): string | null {
   const parsed = parse(foreground);
   if (!parsed) return null;
 
@@ -126,7 +122,7 @@ export function adjustForegroundUntilRatio(
 
   for (let step = 0; step < MAX_STEPS; step++) {
     // Clamp to [0, 1]. Hitting the boundary without clearing target
-    // is the degenerate case — bail out and let the caller offer a
+    // is the degenerate case - bail out and let the caller offer a
     // different rec (e.g. "Use black/white text" or "Change background").
     if (l <= 0 || l >= 1) {
       const clamped = {...oklch, l: Math.max(0, Math.min(1, l))};
@@ -170,7 +166,7 @@ export function adjustForegroundUntilRatio(
  * case ratio against the failing set. Ties go to white (the more
  * common default).
  *
- * Returns null only when none of the failing colours parse — at
+ * Returns null only when none of the failing colours parse - at
  * which point we have nothing sensible to optimise against.
  */
 export function pickSafeBackgroundFor(failingForegrounds: string[]): string | null {
@@ -199,7 +195,7 @@ export function pickSafeBackgroundFor(failingForegrounds: string[]): string | nu
  * white-on-bg and take the winner.
  *
  * (An earlier version routed this through pickSafeBackgroundFor and
- * inverted the result — white text on light backgrounds, black on
+ * inverted the result - white text on light backgrounds, black on
  * dark. This is the corrected, self-evident form.)
  */
 export function pickTextColorFor(bg: string): '#000000' | '#ffffff' {
@@ -226,14 +222,10 @@ const CONTINUOUS_SAMPLE_COUNT = 16;
  * category count (so a 3-category chart is checked against the first
  * 3 colors of tableau10, not all 10).
  *
- * Returns null when the scheme can't be resolved — those candidates
+ * Returns null when the scheme can't be resolved - those candidates
  * just drop out of the safety scan.
  */
-function resolveSchemeColors(
-  schemeName: string,
-  scaleType: SchemeType,
-  categoryCount?: number,
-): string[] | null {
+function resolveSchemeColors(schemeName: string, scaleType: SchemeType, categoryCount?: number): string[] | null {
   let value: unknown;
   try {
     value = vegaScheme(schemeName);
@@ -256,20 +248,14 @@ function resolveSchemeColors(
   // how many categories the data actually uses.
   if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
     const colors = value as string[];
-    return categoryCount && categoryCount > 0
-      ? colors.slice(0, categoryCount)
-      : colors;
+    return categoryCount && categoryCount > 0 ? colors.slice(0, categoryCount) : colors;
   }
 
   return null;
 }
 
 /** Whether every colour in `colors` clears `targetRatio` against `bg`. */
-function allColorsClearRatio(
-  colors: string[],
-  bg: string,
-  targetRatio: number,
-): boolean {
+function allColorsClearRatio(colors: string[], bg: string, targetRatio: number): boolean {
   for (const c of colors) {
     const ratio = computeContrastRatio(c, bg);
     if (ratio == null || ratio < targetRatio) return false;
@@ -290,7 +276,7 @@ function allColorsClearRatio(
  * one back. Categorical schemes are sliced to `categoryCount` before
  * checking, so the result is honest for the chart's actual data.
  *
- * Returns an empty array when no candidate scheme passes — at which
+ * Returns an empty array when no candidate scheme passes - at which
  * point the caller's `applicableWhen` should drop the recommendation
  * entirely (the user keeps the background-change option, which is the
  * other way out of a scale-contrast failure).
@@ -306,17 +292,11 @@ export function findContrastSafeSchemes(args: {
 }): SchemeEntry[] {
   const exclude = args.excludeSchemeName?.toLowerCase().replace(/-\d+$/, '');
 
-  const candidates = SCHEME_CATALOG.filter(
-    (s) => s.type === args.scaleType && s.name !== exclude,
-  );
+  const candidates = SCHEME_CATALOG.filter((s) => s.type === args.scaleType && s.name !== exclude);
 
   const safe: SchemeEntry[] = [];
   for (const candidate of candidates) {
-    const colors = resolveSchemeColors(
-      candidate.name,
-      args.scaleType,
-      args.categoryCount,
-    );
+    const colors = resolveSchemeColors(candidate.name, args.scaleType, args.categoryCount);
     if (!colors || colors.length === 0) continue;
     if (allColorsClearRatio(colors, args.background, args.targetRatio)) {
       safe.push(candidate);

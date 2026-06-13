@@ -6,15 +6,15 @@
  *
  * The rule fires when a categorical field is encoded ONLY through a
  * color channel (color / fill / stroke) with no redundant non-color
- * channel. The fix is always the same shape — "add a non-color
- * channel for the same field" — but WHICH channel is the real
+ * channel. The fix is always the same shape - "add a non-color
+ * channel for the same field" - but WHICH channel is the real
  * trade-off, and it depends on the mark type:
  *
  *   - shape       → renders only on POINT marks. circle/square lock
  *                   their shape (they are point with a fixed shape),
  *                   so the apply converts them to point first.
  *   - strokeDash  → renders only on STROKED path marks (line, rule).
- *                   NOT trail — trail is a filled, variable-width path,
+ *                   NOT trail - trail is a filled, variable-width path,
  *                   so a dash pattern has nothing to dash.
  *   - column      → works for ANY mark (categories separated by
  *                   position instead of color), at the cost of layout
@@ -30,7 +30,7 @@
  *   The rule file's SHAPE_MARKS / STROKE_DASH_MARKS drive its prose
  *   *suggestion* text, where naming circle/square/trail is harmless
  *   advice. Here the recommendations APPLY a real edit, so they must
- *   only offer channels that actually render — otherwise the author
+ *   only offer channels that actually render - otherwise the author
  *   clicks a button and nothing changes (the circle+shape bug).
  */
 
@@ -46,7 +46,7 @@ import {pickTextColorFor} from './contrastAdjust.js';
  * Marks for which we offer a `shape` encoding.
  *
  * All three are "point-like", but only `point` renders a varying
- * shape channel directly — circle and square have their shape locked.
+ * shape channel directly - circle and square have their shape locked.
  * We still offer shape for circle/square because the apply converts
  * them to `point` (kept filled) so the channel takes effect.
  */
@@ -56,7 +56,7 @@ const SHAPE_MARKS = ['point', 'circle', 'square'];
  * Marks for which we offer a `strokeDash` encoding.
  *
  * Only stroked path marks: a dash pattern needs an actual stroke to
- * dash. `line` and `rule` are stroked. `trail` is excluded — it is a
+ * dash. `line` and `rule` are stroked. `trail` is excluded - it is a
  * filled, variable-width path, so strokeDash does not render on it.
  */
 const STROKE_DASH_MARKS = ['line', 'rule'];
@@ -81,11 +81,7 @@ function readColorOnlyEvidence(issue: AccessibilityIssue): ColorOnlyEvidence | n
   if (!e || typeof e !== 'object') return null;
 
   const {channel, fieldName, fieldType} = e;
-  if (
-    typeof channel !== 'string' ||
-    typeof fieldName !== 'string' ||
-    typeof fieldType !== 'string'
-  ) {
+  if (typeof channel !== 'string' || typeof fieldName !== 'string' || typeof fieldType !== 'string') {
     return null;
   }
 
@@ -161,7 +157,7 @@ function buildAddChannel(args: {
           evidence.fieldType,
         ),
       );
-}
+    },
   };
 }
 
@@ -172,11 +168,7 @@ function buildAddChannel(args: {
  * channel we add can mirror its structure (see
  * `buildRedundantChannelDef`).
  */
-function readChannelDef(
-  spec: unknown,
-  encodingPointer: string,
-  channel: string,
-): Record<string, any> | null {
+function readChannelDef(spec: unknown, encodingPointer: string, channel: string): Record<string, any> | null {
   const segments = encodingPointer.split('/').filter(Boolean);
   let node: any = spec;
   for (const seg of segments) {
@@ -194,7 +186,7 @@ function readChannelDef(
  *
  * Why this matters: Vega-Lite merges legends across encodings that
  * share the same (field, type). It tracks an encoding's field by
- * looking BOTH at the channel level and inside `condition` — but
+ * looking BOTH at the channel level and inside `condition` - but
  * legend merging keys off structural depth. A `{condition.field}`
  * colour encoding paired with a `{field}` shape encoding doesn't
  * merge, so a "redundancy" fix ends up producing TWO legends for
@@ -205,7 +197,7 @@ function readChannelDef(
  *   - colour has field inside a condition  → shape mirrors the
  *     condition shape: same predicate (param/test/not/empty), same
  *     field/type, and scale.domain copied across to keep category
- *     order consistent (range is intentionally dropped — shape /
+ *     order consistent (range is intentionally dropped - shape /
  *     strokeDash don't use a colour range).
  */
 function buildRedundantChannelDef(
@@ -243,13 +235,9 @@ function buildRedundantChannelDef(
     }
 
     // Carry over scale.domain so categories sort the same way on
-    // both legends — required for a clean merge. Skip scale.range:
+    // both legends - required for a clean merge. Skip scale.range:
     // shape / strokeDash don't render a colour range.
-    if (
-      condObj.scale &&
-      typeof condObj.scale === 'object' &&
-      !Array.isArray(condObj.scale)
-    ) {
+    if (condObj.scale && typeof condObj.scale === 'object' && !Array.isArray(condObj.scale)) {
       const sourceScale = condObj.scale as Record<string, any>;
       if (sourceScale.domain) {
         mirrored.scale = {domain: sourceScale.domain};
@@ -259,7 +247,7 @@ function buildRedundantChannelDef(
     return {condition: mirrored};
   }
 
-  // Anything we don't recognise (e.g. array of conditions) — keep
+  // Anything we don't recognise (e.g. array of conditions) - keep
   // the simple flat shape. The user will see two legends in that
   // edge case, but the fix still satisfies WCAG 1.4.1.
   return {field: fieldName, type: fieldType};
@@ -314,7 +302,7 @@ export const addShapeEncoding: Recommendation = {
     }
 
     return next;
-  }
+  },
 };
 
 export const addStrokeDashEncoding = buildAddChannel({
@@ -326,21 +314,20 @@ export const addStrokeDashEncoding = buildAddChannel({
     'only a few dash patterns are clearly distinguishable.',
   channel: 'strokeDash',
   family: 'redundancy',
-  appliesTo: (evidence) =>
-    evidence.markType != null && STROKE_DASH_MARKS.includes(evidence.markType),
+  appliesTo: (evidence) => evidence.markType != null && STROKE_DASH_MARKS.includes(evidence.markType),
 });
 
 /**
  * Add text labels for the category field.
  *
  * Written out explicitly (not via buildAddChannel) because the fix is
- * structural — it wraps the unit in a `layer` and adds a `text` mark,
+ * structural - it wraps the unit in a `layer` and adds a `text` mark,
  * rather than adding a channel to the existing encoding block.
  *
  * Applies to ANY mark type: text labels are the one redundant
  * encoding that works everywhere (points, bars, lines, areas). That
  * universality is also the reason it's ordered last among the
- * non-structural fixes — it's the catch-all when shape/strokeDash
+ * non-structural fixes - it's the catch-all when shape/strokeDash
  * don't fit the mark.
  */
 export const addTextLabels: Recommendation = {
@@ -369,13 +356,11 @@ export const addTextLabels: Recommendation = {
     // Pick a text colour that contrasts with whatever background the
     // chart actually has. Without this the text mark inherits Vega-
     // Lite's default (black), which is invisible on a dark background
-    // — exactly the surprise we want to avoid for an accessibility
+    // - exactly the surprise we want to avoid for an accessibility
     // recommendation. resolveBackground walks the same fallback chain
     // contrastRule uses (spec.background → config.background →
     // config.view.fill → white).
-    const {color: background} = resolveBackground(
-      spec as Record<string, unknown>,
-    );
+    const {color: background} = resolveBackground(spec as Record<string, unknown>);
     const textColor = pickTextColorFor(background);
 
     return addTextLabelLayer(spec, unitPointer, {
@@ -385,8 +370,6 @@ export const addTextLabels: Recommendation = {
     });
   },
 };
-
-
 
 // ─── Registry ────────────────────────────────────────────────────
 

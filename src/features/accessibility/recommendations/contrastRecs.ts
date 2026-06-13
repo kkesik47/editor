@@ -18,10 +18,10 @@
  * The non-text-aa issue comes in two flavours, distinguished by the
  * shape of evidence:
  *
- *   Single-mark flavour  — allColors.length === 1
+ *   Single-mark flavour  - allColors.length === 1
  *     Same trade-off as text: nudge fg vs. change bg.
  *
- *   Scale flavour        — allColors.length > 1, failingColors present
+ *   Scale flavour        - allColors.length > 1, failingColors present
  *     No single foreground to nudge. Trade-off becomes:
  *       "Switch to a contrast-safe palette" (keeps bg, drops palette)
  *     vs
@@ -43,13 +43,7 @@
 
 import type {AccessibilityIssue} from '../types.js';
 import type {Recommendation, VegaLiteSpec} from './types.js';
-import {
-  setValueAt,
-  setConfigProperty,
-  setScheme,
-  replaceColorInRange,
-  parentPointer,
-} from './specMutators.js';
+import {setValueAt, setConfigProperty, setScheme, replaceColorInRange, parentPointer} from './specMutators.js';
 import {
   adjustForegroundUntilRatio,
   findContrastSafeSchemes,
@@ -61,7 +55,7 @@ import type {SchemeType} from './schemeCatalog.js';
 // ─── Evidence reader ─────────────────────────────────────────────
 
 interface ContrastEvidence {
-  /** WCAG criterion level — drives AA vs AAA thresholds. */
+  /** WCAG criterion level - drives AA vs AAA thresholds. */
   wcagLevel: 'AA' | 'AAA';
   /** 'text' for text issues, 'non-text' for mark/scale issues. */
   elementType: 'text' | 'non-text';
@@ -70,9 +64,9 @@ interface ContrastEvidence {
   backgroundColor: string;
   contrastRatio: number | null;
   threshold: number;
-  /** Inline / config / default — drives where text fixes are written. */
+  /** Inline / config / default - drives where text fixes are written. */
   source: 'inline' | 'config' | 'default' | null;
-  /** Element label, e.g. "X-axis labels" — used in some descriptions. */
+  /** Element label, e.g. "X-axis labels" - used in some descriptions. */
   elementLabel: string | null;
   /**
    * For scale-flavour non-text issues: the list of colours in the
@@ -133,35 +127,24 @@ function readContrastEvidence(issue: AccessibilityIssue): ContrastEvidence | nul
         const r = (entry as Record<string, unknown>) ?? {};
         return {color: r.color, index: r.index};
       })
-      .filter(
-        (x): x is {color: string; index: number} =>
-          typeof x.color === 'string' && typeof x.index === 'number',
-      );
+      .filter((x): x is {color: string; index: number} => typeof x.color === 'string' && typeof x.index === 'number');
   }
-  const failingColors = failingEntries
-    ? failingEntries.map((x) => x.color)
-    : null;
+  const failingColors = failingEntries ? failingEntries.map((x) => x.color) : null;
 
   const scaleTypeRaw = e.scaleType;
   const scaleType =
-    scaleTypeRaw === 'categorical' ||
-    scaleTypeRaw === 'sequential' ||
-    scaleTypeRaw === 'diverging'
+    scaleTypeRaw === 'categorical' || scaleTypeRaw === 'sequential' || scaleTypeRaw === 'diverging'
       ? scaleTypeRaw
       : null;
 
   return {
     wcagLevel,
     elementType,
-    foregroundColor:
-      typeof e.foregroundColor === 'string' ? e.foregroundColor : null,
+    foregroundColor: typeof e.foregroundColor === 'string' ? e.foregroundColor : null,
     backgroundColor,
     contrastRatio: typeof e.contrastRatio === 'number' ? e.contrastRatio : null,
     threshold,
-    source:
-      e.source === 'inline' || e.source === 'config' || e.source === 'default'
-        ? e.source
-        : null,
+    source: e.source === 'inline' || e.source === 'config' || e.source === 'default' ? e.source : null,
     elementLabel: typeof e.elementLabel === 'string' ? e.elementLabel : null,
     allColors: Array.isArray(e.allColors)
       ? (e.allColors as unknown[]).filter((c): c is string => typeof c === 'string')
@@ -181,18 +164,11 @@ function isTextIssue(ev: ContrastEvidence): boolean {
 }
 
 function isSingleMarkIssue(ev: ContrastEvidence): boolean {
-  return (
-    ev.elementType === 'non-text' &&
-    (ev.allColors == null || ev.allColors.length <= 1)
-  );
+  return ev.elementType === 'non-text' && (ev.allColors == null || ev.allColors.length <= 1);
 }
 
 function isScaleIssue(ev: ContrastEvidence): boolean {
-  return (
-    ev.elementType === 'non-text' &&
-    ev.allColors != null &&
-    ev.allColors.length > 1
-  );
+  return ev.elementType === 'non-text' && ev.allColors != null && ev.allColors.length > 1;
 }
 
 // ─── The set of colours that are actually failing ───────────────
@@ -201,7 +177,7 @@ function isScaleIssue(ev: ContrastEvidence): boolean {
  * Which colour(s) the "Change background" rec needs to optimise
  * against. For text and single-mark issues this is the lone
  * foreground. For scale issues it's the subset that fell below the
- * threshold — passing colours in the same scale don't need help and
+ * threshold - passing colours in the same scale don't need help and
  * shouldn't influence the choice of extreme.
  *
  * Returns an empty array when nothing is identifiable as failing,
@@ -241,7 +217,7 @@ function writeForeground(
   // and the label cleanly tells us section + property.
   const target = configTargetForLabel(ev.elementLabel);
   if (!target) {
-    // Unknown label shape — fall back to writing at the pointer,
+    // Unknown label shape - fall back to writing at the pointer,
     // which addresses the channel or axis/legend object. Not ideal,
     // but never destructive.
     return setValueAt(spec, issue.jsonPointer, newColor);
@@ -256,9 +232,7 @@ function writeForeground(
  * truth would be nicer, but the labels live on the analysis side
  * and we don't want this module importing analysis internals.
  */
-function configTargetForLabel(
-  label: string | null,
-): {section: string; property: string} | null {
+function configTargetForLabel(label: string | null): {section: string; property: string} | null {
   if (!label) return null;
   if (label === 'Chart title') return {section: 'title', property: 'color'};
   if (label.endsWith('axis labels')) return {section: 'axis', property: 'labelColor'};
@@ -286,11 +260,11 @@ function blackOrWhiteText(bg: string): '#000000' | '#ffffff' {
 /**
  * Build the "adjust foreground" rec for one of two flavours:
  *
- *   text       — applies to text-AA and text-AAA issues
- *   singleMark — applies to single-mark non-text-AA issues
+ *   text       - applies to text-AA and text-AAA issues
+ *   singleMark - applies to single-mark non-text-AA issues
  *
  * Split because the user-facing language differs ("text" vs "mark"),
- * not because the mechanics differ — both share the same OKLCH
+ * not because the mechanics differ - both share the same OKLCH
  * lightness nudge and the same writeForeground path.
  */
 function buildAdjustForegroundRec(args: {
@@ -310,13 +284,9 @@ function buildAdjustForegroundRec(args: {
       if (!ev || !args.applies(ev)) return false;
       if (!ev.foregroundColor) return false;
 
-      // Don't offer if we can't actually reach the target — degenerate
+      // Don't offer if we can't actually reach the target - degenerate
       // cases (near-extreme fg against same-toned bg).
-      const adjusted = adjustForegroundUntilRatio(
-        ev.foregroundColor,
-        ev.backgroundColor,
-        ev.threshold,
-      );
+      const adjusted = adjustForegroundUntilRatio(ev.foregroundColor, ev.backgroundColor, ev.threshold);
       return adjusted != null;
     },
 
@@ -324,11 +294,7 @@ function buildAdjustForegroundRec(args: {
       const ev = readContrastEvidence(issue);
       if (!ev || !ev.foregroundColor) return spec;
 
-      const adjusted = adjustForegroundUntilRatio(
-        ev.foregroundColor,
-        ev.backgroundColor,
-        ev.threshold,
-      );
+      const adjusted = adjustForegroundUntilRatio(ev.foregroundColor, ev.backgroundColor, ev.threshold);
       if (!adjusted) return spec;
 
       return writeForeground(spec, issue, ev, adjusted);
@@ -343,9 +309,9 @@ export const adjustTextLightness = buildAdjustForegroundRec({
   label: 'Adjust the text color',
   description:
     'Keeps the background as it is and shifts the text colour just ' +
-    "enough to meet the contrast threshold. Hue is preserved so the " +
+    'enough to meet the contrast threshold. Hue is preserved so the ' +
     "colour's identity is kept; only its lightness changes. The " +
-    'lightest possible touch — only affects the failing element.',
+    'lightest possible touch - only affects the failing element.',
   applies: isTextIssue,
 });
 
@@ -354,16 +320,16 @@ export const adjustMarkLightness = buildAdjustForegroundRec({
   label: 'Adjust the mark color',
   description:
     'Keeps the background as it is and shifts the mark colour just ' +
-    "enough to meet the contrast threshold. Hue is preserved so the " +
+    'enough to meet the contrast threshold. Hue is preserved so the ' +
     "colour's identity is kept; only its lightness changes. The " +
-    'lightest possible touch — only affects the failing mark.',
+    'lightest possible touch - only affects the failing mark.',
   applies: isSingleMarkIssue,
 });
 
 // ─── Recommendation: adjust the failing scale colour(s) ─────────
 
 /**
- * "Adjust the failing colors" — the scale-flavour counterpart to
+ * "Adjust the failing colors" - the scale-flavour counterpart to
  * adjustMarkLightness. Keeps the background and every PASSING colour
  * untouched, and nudges only the colour(s) that fall below the
  * threshold until they clear it. Hue is preserved (OKLCH lightness
@@ -383,8 +349,8 @@ export const adjustScaleColors: Recommendation = {
   description:
     'Keeps the background and every passing colour, and shifts only ' +
     'the colour(s) below the contrast threshold just enough to clear ' +
-    'it. Hue is preserved — only lightness changes — so each colour ' +
-    "keeps its identity. The most targeted fix for a palette, since " +
+    'it. Hue is preserved - only lightness changes - so each colour ' +
+    'keeps its identity. The most targeted fix for a palette, since ' +
     'the rest of the colours are left exactly as they are.',
   family: 'adjustment',
 
@@ -397,11 +363,7 @@ export const adjustScaleColors: Recommendation = {
 
     // Only offer if every failing colour can actually reach the target;
     // otherwise applying this would leave the warning partly in place.
-    return failing.every(
-      (f) =>
-        adjustForegroundUntilRatio(f.color, ev.backgroundColor, ev.threshold) !=
-        null,
-    );
+    return failing.every((f) => adjustForegroundUntilRatio(f.color, ev.backgroundColor, ev.threshold) != null);
   },
 
   apply(issue, spec) {
@@ -410,7 +372,7 @@ export const adjustScaleColors: Recommendation = {
 
     const failing = ev.failingEntries ?? [];
     // The pointer addresses scale.range (or scale.scheme); its parent
-    // is the scale object — the shape replaceColorInRange expects.
+    // is the scale object - the shape replaceColorInRange expects.
     const scalePointer = parentPointer(issue.jsonPointer);
     const fallback = ev.allColors ?? [];
 
@@ -419,11 +381,7 @@ export const adjustScaleColors: Recommendation = {
     // range before the colour is replaced.
     let next = spec;
     for (const f of failing) {
-      const adjusted = adjustForegroundUntilRatio(
-        f.color,
-        ev.backgroundColor,
-        ev.threshold,
-      );
+      const adjusted = adjustForegroundUntilRatio(f.color, ev.backgroundColor, ev.threshold);
       if (!adjusted) continue; // guarded by applicableWhen
       next = replaceColorInRange(next, scalePointer, f.index, adjusted, fallback);
     }
@@ -434,7 +392,7 @@ export const adjustScaleColors: Recommendation = {
 // ─── Recommendations: pure black/white text ─────────────────────
 
 /**
- * "Use black/white text" — text-only nuclear option. Guarantees
+ * "Use black/white text" - text-only nuclear option. Guarantees
  * maximum contrast against the background by snapping to whichever
  * extreme works. Sacrifices any colour the text had.
  *
@@ -467,19 +425,19 @@ export const useBlackOrWhiteText: Recommendation = {
 // ─── Recommendations: change background ─────────────────────────
 
 /**
- * "Change background" — keeps every foreground colour and adjusts the
+ * "Change background" - keeps every foreground colour and adjusts the
  * background instead. Snaps to whichever extreme (white or near-
  * black) maximises the minimum contrast against the failing
  * foreground(s).
  *
- * Applies to all three issue shapes — text, single-mark, AND scale —
+ * Applies to all three issue shapes - text, single-mark, AND scale -
  * because in every case the relationship can be fixed from this side.
  *
  * v2 fix: the picker is now driven by the failing FOREGROUNDS, not
  * the current background. Previously a near-black scale on a black
  * background would snap to near-black, lowering contrast further; now
  * it correctly snaps to white. For scale issues, the optimisation
- * considers ONLY the colours that actually failed — passing colours
+ * considers ONLY the colours that actually failed - passing colours
  * in the same scale don't need help and shouldn't drag the choice.
  */
 export const changeBackground: Recommendation = {
@@ -503,7 +461,7 @@ export const changeBackground: Recommendation = {
     const target = pickSafeBackgroundFor(failing);
     if (!target) return false;
 
-    // Don't offer if the safe target equals the current background —
+    // Don't offer if the safe target equals the current background -
     // would be a no-op edit.
     return ev.backgroundColor.toLowerCase() !== target.toLowerCase();
   },
@@ -516,7 +474,7 @@ export const changeBackground: Recommendation = {
     const target = pickSafeBackgroundFor(failing);
     if (!target) return spec;
 
-    // Write at top-level `background` — simplest, most visible, and
+    // Write at top-level `background` - simplest, most visible, and
     // takes precedence over config.background / config.view.fill.
     return setValueAt(spec, '/background', target);
   },
@@ -535,11 +493,7 @@ export const changeBackground: Recommendation = {
 // scope is later extended to gradients, expand this list and update
 // the file-header note.
 
-function buildSchemeSwapRec(args: {
-  schemeName: string;
-  schemeType: SchemeType;
-  schemeNotes: string;
-}): Recommendation {
+function buildSchemeSwapRec(args: {schemeName: string; schemeType: SchemeType; schemeNotes: string}): Recommendation {
   return {
     id: `contrast-swap-to-${args.schemeName}`,
     label: `Switch to ${args.schemeName}`,
@@ -570,7 +524,7 @@ function buildSchemeSwapRec(args: {
 
     apply(issue, spec) {
       // The pointer addresses the scale.range or scale.scheme; its
-      // parent is the scale object — same shape colourblindSafetyRecs
+      // parent is the scale object - same shape colourblindSafetyRecs
       // and colorRiskRecs use.
       return setScheme(spec, parentPointer(issue.jsonPointer), args.schemeName);
     },

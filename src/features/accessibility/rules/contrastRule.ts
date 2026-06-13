@@ -6,25 +6,25 @@
  *
  * Three checks, mapped to WCAG levels:
  *
- *   Level AA — WCAG 1.4.3 (Contrast – Minimum)
+ *   Level AA - WCAG 1.4.3 (Contrast – Minimum)
  *     Text elements (titles, axis labels, legend labels) must have
  *     a contrast ratio ≥ 4.5:1 against the background.
  *     Severity: 'warning' for author-set values, 'info' for defaults.
  *
- *   Level AA — WCAG 1.4.11 (Non-Text Contrast)
+ *   Level AA - WCAG 1.4.11 (Non-Text Contrast)
  *     Graphical elements (marks, scale colors) must have a contrast
  *     ratio ≥ 3:1 against the background.
  *     Severity: 'warning'.
- *     Only checked for categorical scales — sequential/diverging
+ *     Only checked for categorical scales - sequential/diverging
  *     scales are handled by lightnessContrastRule instead.
  *
- *   Level AAA — WCAG 1.4.6 (Contrast – Enhanced)
+ *   Level AAA - WCAG 1.4.6 (Contrast – Enhanced)
  *     Text elements should have a contrast ratio ≥ 7:1.
  *     Severity: 'info' (suggestion, not mandatory).
  *
  * Architecture:
- *   1. contrastAnalysis.ts — resolve colors, compute ratios
- *   2. this file           — orchestrate and produce issues
+ *   1. contrastAnalysis.ts - resolve colors, compute ratios
+ *   2. this file           - orchestrate and produce issues
  */
 
 import type {AccessibilityIssue, AccessibilityRule} from '../types.js';
@@ -48,7 +48,7 @@ import {WCAG_CONTRAST_MIN, WCAG_CONTRAST_ENHANCED, WCAG_NON_TEXT_CONTRAST} from 
  * Evidence includes `elementLabel` so the renderer can produce a
  * "sample text" preview showing the element's name (e.g. "X-axis
  * labels") rendered in the failing foreground color on the actual
- * background — letting the user see the legibility problem directly.
+ * background - letting the user see the legibility problem directly.
  */
 function buildTextAAIssue(entry: TextContrastEntry, bg: string): AccessibilityIssue {
   const sourceLabel =
@@ -93,7 +93,7 @@ function buildTextAAIssue(entry: TextContrastEntry, bg: string): AccessibilityIs
 /**
  * Build an issue for a text element that passes AA but fails AAA.
  *
- * This is a suggestion, not a requirement — the visualization is
+ * This is a suggestion, not a requirement - the visualization is
  * already AA-compliant, but could be improved.
  */
 function buildTextAAAIssue(entry: TextContrastEntry, bg: string): AccessibilityIssue {
@@ -134,7 +134,7 @@ function buildTextAAAIssue(entry: TextContrastEntry, bg: string): AccessibilityI
  *
  * Evidence includes `allColors` and `allRatios` (each as a single-
  * element array) so the renderer can reuse the scale-contrast preview
- * SVG to show one swatch on the background — visually consistent with
+ * SVG to show one swatch on the background - visually consistent with
  * how multi-color scale issues are rendered.
  */
 function buildMarkAAIssue(entry: MarkContrastEntry, bg: string): AccessibilityIssue {
@@ -243,10 +243,10 @@ export const contrastRule: AccessibilityRule = {
 
     for (const entry of result.textEntries) {
       if (entry.contrastRatio < TEXT_AA_THRESHOLD) {
-        // Fails AA — this is a problem
+        // Fails AA - this is a problem
         issues.push(buildTextAAIssue(entry, bg));
       } else if (entry.contrastRatio < TEXT_AAA_THRESHOLD) {
-        // Passes AA but fails AAA — this is a suggestion
+        // Passes AA but fails AAA - this is a suggestion
         issues.push(buildTextAAAIssue(entry, bg));
       }
       // If ratio ≥ 7 → passes both AA and AAA, no issue

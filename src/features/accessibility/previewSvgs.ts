@@ -7,7 +7,7 @@
  * suitable for use as the `src` of an `<img>` element, or wrapped in
  * Markdown image syntax for Monaco hover tooltips.
  *
- * An empty string means "no preview is applicable for this issue" —
+ * An empty string means "no preview is applicable for this issue" -
  * callers should treat empty strings as "skip this preview".
  *
  * Preview types and when they apply:
@@ -26,12 +26,11 @@ import type {AccessibilityIssue} from './types.js';
 // every preview looks like it belongs to the same family.
 
 /** Font stack matching --base-font-family from app.css. */
-const FONT_STACK =
-  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const FONT_STACK = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /** Type scale (in px). */
-const FONT_SIZE_MAIN = 12;   // row labels, section labels
-const FONT_SIZE_SMALL = 11;  // captions, ratios, secondary info
+const FONT_SIZE_MAIN = 12; // row labels, section labels
+const FONT_SIZE_SMALL = 11; // captions, ratios, secondary info
 
 /** Spacing unit (in px). All gaps are multiples of this. */
 const SPACE = 4;
@@ -71,7 +70,7 @@ function formatNumber(n: number): string {
  *
  * The multipliers are deliberately generous: real width depends on
  * font family (Segoe UI on Windows is wider than -apple-system on
- * macOS) and which characters appear. Over-estimating is safe — it
+ * macOS) and which characters appear. Over-estimating is safe - it
  * just leaves a little extra horizontal padding.
  */
 function estimateTextWidth(text: string, fontSize: number): number {
@@ -122,9 +121,9 @@ function buildTwoRowColorPreview(
   isContinuous: boolean,
 ): string {
   const barH = 20;
-  const rowGap = SPACE + 2;       // 6
-  const paddingX = SPACE * 2;     // 8
-  const paddingY = SPACE + 2;     // 6
+  const rowGap = SPACE + 2; // 6
+  const paddingX = SPACE * 2; // 8
+  const paddingY = SPACE + 2; // 6
 
   // For categorical scales: pick a swatch width that keeps the row
   // under TWO_ROW_MAX_BAR_W even with many colours. Minimum width 12
@@ -225,12 +224,7 @@ export function buildCvdPreviewDataUri(issue: AccessibilityIssue): string {
   const simLabel = cvdLabels[cvdType as string] ?? 'Simulated';
   const isContinuous = isGradientScaleType(scaleType);
 
-  return buildTwoRowColorPreview(
-    originalColors as string[],
-    simulatedColors as string[],
-    simLabel,
-    isContinuous,
-  );
+  return buildTwoRowColorPreview(originalColors as string[], simulatedColors as string[], simLabel, isContinuous);
 }
 
 // ─── Grayscale preview ──────────────────────────────────────────
@@ -248,12 +242,7 @@ export function buildGrayscalePreviewDataUri(issue: AccessibilityIssue): string 
 
   const isContinuous = isGradientScaleType(scaleType);
 
-  return buildTwoRowColorPreview(
-    originalColors as string[],
-    grayscaleColors as string[],
-    'Grayscale',
-    isContinuous,
-  );
+  return buildTwoRowColorPreview(originalColors as string[], grayscaleColors as string[], 'Grayscale', isContinuous);
 }
 
 // ─── Perceptual uniformity preview ──────────────────────────────
@@ -263,8 +252,8 @@ export function buildGrayscalePreviewDataUri(issue: AccessibilityIssue): string 
  *
  * Layout:
  *   Row 1: full gradient bar of the scale
- *   Row 2: "Biggest color change (33%→40%)"  — swatches + ΔE
- *   Row 3: "Smallest color change (60%→67%)" — swatches + ΔE
+ *   Row 2: "Biggest color change (33%→40%)"  - swatches + ΔE
+ *   Row 3: "Smallest color change (60%→67%)" - swatches + ΔE
  *
  * Position labels use real data values when `domain` is available,
  * otherwise fall back to scale percentages.
@@ -289,8 +278,7 @@ export function buildUniformityPreviewDataUri(issue: AccessibilityIssue): string
   // The full ordered color list (when provided) is used to draw the
   // gradient bar, so the user still sees the whole scale.
   const fullScaleColors =
-    Array.isArray(evidence.gradientColors) &&
-    (evidence.gradientColors as unknown[]).every((c) => typeof c === 'string')
+    Array.isArray(evidence.gradientColors) && (evidence.gradientColors as unknown[]).every((c) => typeof c === 'string')
       ? (evidence.gradientColors as string[])
       : null;
 
@@ -327,20 +315,19 @@ export function buildUniformityPreviewDataUri(issue: AccessibilityIssue): string
   // full scale (passed in via evidence.gradientColors) so the user
   // sees the whole palette in context. For sequential issues we
   // reconstruct from the step list (which is the whole scale anyway).
-  const allColors: string[] =
-    fullScaleColors ?? [...steps.map((s) => s.colorA), steps[steps.length - 1].colorB];
+  const allColors: string[] = fullScaleColors ?? [...steps.map((s) => s.colorA), steps[steps.length - 1].colorB];
 
   // ── Layout constants ──
   const labelW = 220;
-  const paddingX = SPACE * 2;     // 8
-  const paddingY = SPACE + 2;     // 6
+  const paddingX = SPACE * 2; // 8
+  const paddingY = SPACE + 2; // 6
   const barW = 220;
   const barH = 16;
   const swatchW = 36;
   const swatchH = 22;
-  const swatchGap = SPACE + 1;    // 5
+  const swatchGap = SPACE + 1; // 5
   const arrowW = 10;
-  const rowGap = SPACE * 2;       // 8
+  const rowGap = SPACE * 2; // 8
   const barX = labelW + paddingX;
 
   const gradientY = paddingY;
@@ -363,13 +350,7 @@ export function buildUniformityPreviewDataUri(issue: AccessibilityIssue): string
   const scaleLabelY = gradientY + barH / 2;
   const scaleLabel = `<text x="${paddingX}" y="${scaleLabelY}" dominant-baseline="middle" style="${TEXT_MAIN}">Scale</text>`;
 
-  const buildPairRow = (
-    label: string,
-    colorA: string,
-    colorB: string,
-    deltaE: number,
-    y: number,
-  ): string => {
+  const buildPairRow = (label: string, colorA: string, colorB: string, deltaE: number, y: number): string => {
     const swatchAX = barX;
     const arrowX = swatchAX + swatchW + swatchGap;
     const swatchBX = arrowX + arrowW + swatchGap;
@@ -415,74 +396,69 @@ export function buildUniformityPreviewDataUri(issue: AccessibilityIssue): string
  */
 export function buildContrastPreviewDataUri(issue: AccessibilityIssue): string {
   const {allColors, allRatios, backgroundColor, threshold} = issue.evidence ?? {};
- 
-  if (
-    !Array.isArray(allColors) ||
-    !Array.isArray(allRatios) ||
-    allColors.length === 0
-  ) {
+
+  if (!Array.isArray(allColors) || !Array.isArray(allRatios) || allColors.length === 0) {
     return '';
   }
- 
+
   const bg = (backgroundColor as string) ?? COLOR_BG;
   const limit = (threshold as number) ?? 3;
   const colors = allColors as string[];
   const ratios = allRatios as number[];
- 
+
   // ── Layout ──
   const swatchW = 40;
   const swatchH = 35;
-  const swatchGap = SPACE + 2;   // 6
-  const paddingX = SPACE * 2;    // 8
-  const paddingY = SPACE    // 4
-  const headerH = FONT_SIZE_MAIN;       // header row height
-  const ratioH = FONT_SIZE_SMALL + SPACE;       // ratio row height
-  const headerSwatchGap = SPACE*3;                // gap between header and swatches
-  const swatchRatioGap = SPACE*1.5;                 // gap between swatches and ratio labels
-  const inset = SPACE*2;                          // bg peek-through
- 
+  const swatchGap = SPACE + 2; // 6
+  const paddingX = SPACE * 2; // 8
+  const paddingY = SPACE; // 4
+  const headerH = FONT_SIZE_MAIN; // header row height
+  const ratioH = FONT_SIZE_SMALL + SPACE; // ratio row height
+  const headerSwatchGap = SPACE * 3; // gap between header and swatches
+  const swatchRatioGap = SPACE * 1.5; // gap between swatches and ratio labels
+  const inset = SPACE * 2; // bg peek-through
+
   const count = colors.length;
   const totalSwatchW = count * (swatchW + swatchGap) - swatchGap;
- 
+
   // Ensure SVG is wide enough for header text.
   const headerText = `Background: ${bg}`;
   const headerNeededW = estimateTextWidth(headerText, FONT_SIZE_MAIN) + paddingX * 2;
- 
+
   const svgW = Math.max(totalSwatchW + paddingX * 2, headerNeededW);
   const svgH = paddingY + headerH + headerSwatchGap + swatchH + swatchRatioGap + ratioH + paddingY;
- 
+
   // ── Header ──
   const headerY = paddingY + headerH / 2;
   const header =
-    `<text x="${paddingX}" y="${headerY}" dominant-baseline="middle" style="${TEXT_MAIN}">` +
-    `${headerText}</text>`;
- 
+    `<text x="${paddingX}" y="${headerY}" dominant-baseline="middle" style="${TEXT_MAIN}">` + `${headerText}</text>`;
+
   // ── Swatches ──
   const swatchY = paddingY + headerH + headerSwatchGap;
   const ratioCenterY = swatchY + swatchH + swatchRatioGap + ratioH / 2;
- 
+
   const swatches = colors
     .map((color, i) => {
       const x = paddingX + i * (swatchW + swatchGap);
       const ratio = ratios[i] ?? 0;
       const fails = ratio < limit;
- 
+
       // Background rect (chart bg shows behind the swatch)
       const bgRect =
         `<rect x="${x}" y="${swatchY}" width="${swatchW}" height="${swatchH}" ` +
         `fill="${bg}" rx="3" stroke="${COLOR_BORDER}" stroke-width="0.5"/>`;
- 
+
       // Color swatch (slightly inset so bg peeks through)
       const swatch =
         `<rect x="${x + inset}" y="${swatchY + inset}" ` +
         `width="${swatchW - inset * 2}" height="${swatchH - inset * 2}" ` +
         `fill="${color}" rx="2"/>`;
- 
-      // No red border in this variant — the swatch sits fully visible
+
+      // No red border in this variant - the swatch sits fully visible
       // on the background, and the red ratio label below carries the
       // failure signal on its own.
       const border = '';
- 
+
       // Ratio label (red if failing, green if passing)
       const ratioColor = fails ? COLOR_FAIL : COLOR_PASS;
       const ratioLabel =
@@ -490,11 +466,11 @@ export function buildContrastPreviewDataUri(issue: AccessibilityIssue): string {
         `text-anchor="middle" dominant-baseline="middle" ` +
         `style="font-family:${FONT_STACK};font-size:${FONT_SIZE_SMALL}px;fill:${ratioColor};font-weight:600">` +
         `${formatNumber(ratio)}:1</text>`;
- 
+
       return bgRect + swatch + border + ratioLabel;
     })
     .join('');
- 
+
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`,
     `<rect width="${svgW}" height="${svgH}" fill="${COLOR_BG}" rx="4"/>`,
@@ -502,7 +478,7 @@ export function buildContrastPreviewDataUri(issue: AccessibilityIssue): string {
     swatches,
     `</svg>`,
   ].join('');
- 
+
   return svgToDataUri(svg);
 }
 
@@ -520,15 +496,8 @@ export function buildContrastPreviewDataUri(issue: AccessibilityIssue): string {
  * or has no element label.
  */
 export function buildTextSamplePreviewDataUri(issue: AccessibilityIssue): string {
-  const {
-    elementType,
-    elementLabel,
-    foregroundColor,
-    backgroundColor,
-    contrastRatio,
-    threshold,
-    wcagLevel,
-  } = issue.evidence ?? {};
+  const {elementType, elementLabel, foregroundColor, backgroundColor, contrastRatio, threshold, wcagLevel} =
+    issue.evidence ?? {};
 
   if (elementType !== 'text' || typeof elementLabel !== 'string') {
     return '';
@@ -543,12 +512,12 @@ export function buildTextSamplePreviewDataUri(issue: AccessibilityIssue): string
 
   // ── Layout ──
   const sampleFontSize = 14;
-  const sampleVerticalPadding = SPACE * 3;                    // 12
+  const sampleVerticalPadding = SPACE * 3; // 12
   const sampleH = sampleFontSize + sampleVerticalPadding * 2; // 38
-  const paddingX = SPACE * 2;                                 // 8
-  const paddingY = SPACE + 2;                                 // 6
-  const captionGap = SPACE;                                   // 4
-  const captionH = FONT_SIZE_SMALL + SPACE;                   // 15
+  const paddingX = SPACE * 2; // 8
+  const paddingY = SPACE + 2; // 6
+  const captionGap = SPACE; // 4
+  const captionH = FONT_SIZE_SMALL + SPACE; // 15
 
   // Phrasing differs by WCAG level.
   let captionText: string;

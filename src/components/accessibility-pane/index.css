@@ -235,7 +235,7 @@
   color: #1a1919;
 }
 
-/* Recommendations — actionable fix buttons */
+/* Recommendations - actionable fix buttons */
 
 .accessibility-pane .a11y-issue-recommendations {
   margin-top: 5px;
@@ -274,7 +274,9 @@
   text-align: left;
   font-family: var(--base-font-family);
   line-height: 1.4;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .accessibility-pane .a11y-recommendation:hover {
@@ -306,7 +308,7 @@
    Mirrors the editor's line-highlight colours so the three
    surfaces (chart, editor, pane) feel like one synchronised view. */
 .accessibility-pane .a11y-issue.is-hovered.severity-warning {
-  background-color: rgba(255, 193, 7, 0.10);
+  background-color: rgba(255, 193, 7, 0.1);
 }
 .accessibility-pane .a11y-issue.is-hovered.severity-info {
   background-color: rgba(28, 138, 228, 0.08);
@@ -320,6 +322,10 @@
   animation: a11y-focus-flash 1.2s ease-out;
 }
 @keyframes a11y-focus-flash {
-  0%   { box-shadow: 0 0 0 2px rgba(28, 138, 228, 0.55); }
-  100% { box-shadow: 0 0 0 2px rgba(28, 138, 228, 0); }
+  0% {
+    box-shadow: 0 0 0 2px rgba(28, 138, 228, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(28, 138, 228, 0);
+  }
 }

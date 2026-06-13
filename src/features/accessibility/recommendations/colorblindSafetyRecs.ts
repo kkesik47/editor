@@ -24,8 +24,8 @@
  *   - Vega-registered schemes (set via scale.scheme):
  *     swapToTableau10, swapToSet2, swapToDark2, swapToObservable10
  *   - Hand-picked, guaranteed-safe palettes (set via scale.range):
- *     swapToOkabeIto  — the de-facto CVD-safe standard (8 colors)
- *     swapToWong      — Nature Methods recommendation (7 colors)
+ *     swapToOkabeIto  - the de-facto CVD-safe standard (8 colors)
+ *     swapToWong      - Nature Methods recommendation (7 colors)
  *
  *   The hand-picked palettes are added so that authors with small
  *   categorical scales (2–8 categories) get a guaranteed-safe option
@@ -55,17 +55,12 @@ function readCvdEvidence(issue: AccessibilityIssue): CvdEvidence | null {
   if (!e || typeof e !== 'object') return null;
 
   const scaleType = e.scaleType;
-  if (
-    scaleType !== 'categorical' &&
-    scaleType !== 'sequential' &&
-    scaleType !== 'diverging'
-  ) {
+  if (scaleType !== 'categorical' && scaleType !== 'sequential' && scaleType !== 'diverging') {
     return null;
   }
 
   const schemeName = typeof e.schemeName === 'string' ? e.schemeName : null;
-  const usedCategoryCount =
-    typeof e.usedCategoryCount === 'number' ? e.usedCategoryCount : null;
+  const usedCategoryCount = typeof e.usedCategoryCount === 'number' ? e.usedCategoryCount : null;
   return {scaleType, schemeName, usedCategoryCount};
 }
 
@@ -143,14 +138,14 @@ const WONG: string[] = [
  * triggering it again under the same simulation.
  *
  * When `usedCategoryCount` is null (data loaded from a URL, no explicit
- * domain), we err on the side of NOT recommending — same as set2's
+ * domain), we err on the side of NOT recommending - same as set2's
  * original behaviour.
  */
 const CATEGORICAL_SAFE_LIMITS: Record<string, number> = {
-  tableau10:    7,
-  dark2:        6,
+  tableau10: 7,
+  dark2: 6,
   observable10: 5,
-  set2:         3,
+  set2: 3,
 };
 
 function isUnderSafeLimit(schemeName: string, usedCategoryCount: number | null): boolean {
@@ -163,7 +158,7 @@ function isUnderSafeLimit(schemeName: string, usedCategoryCount: number | null):
 /**
  * Build a "swap to a Vega-registered scheme" recommendation.
  *
- * Used for schemes like viridis, tableau10 — anything in Vega's
+ * Used for schemes like viridis, tableau10 - anything in Vega's
  * scheme registry that can be referenced by `scale.scheme: "name"`.
  */
 function buildSchemeSwap(args: {
@@ -221,10 +216,7 @@ function buildRangeSwap(args: {
       const evidence = readCvdEvidence(issue);
       if (!evidence) return false;
       // Don't offer a palette that has fewer colors than the data needs.
-      if (
-        evidence.usedCategoryCount != null &&
-        evidence.usedCategoryCount > args.palette.length
-      ) {
+      if (evidence.usedCategoryCount != null && evidence.usedCategoryCount > args.palette.length) {
         return false;
       }
       return args.applies(evidence);
@@ -246,7 +238,7 @@ export const swapToViridis = buildSchemeSwap({
   label: 'Switch to viridis',
   description:
     'Perceptually uniform sequential palette, CVD-safe. Strong neutral ' +
-    'default — sacrifices any specific hue feel for the most defensible ' +
+    'default - sacrifices any specific hue feel for the most defensible ' +
     'accessibility profile.',
   schemeName: 'viridis',
   applies: (evidence) => evidence.scaleType === 'sequential',
@@ -271,8 +263,7 @@ export const swapToTurbo = buildSchemeSwap({
     'high dynamic range while being substantially safer under simulated ' +
     'color vision deficiencies than classic rainbow.',
   schemeName: 'turbo',
-  applies: (evidence) =>
-    evidence.scaleType === 'sequential' && isRainbowLikeOriginal(evidence),
+  applies: (evidence) => evidence.scaleType === 'sequential' && isRainbowLikeOriginal(evidence),
 });
 
 export const swapToMagma = buildSchemeSwap({
@@ -283,8 +274,7 @@ export const swapToMagma = buildSchemeSwap({
     '(dark purple → orange → yellow). Best when the original palette was ' +
     'warm and you want to preserve that feel.',
   schemeName: 'magma',
-  applies: (evidence) =>
-    evidence.scaleType === 'sequential' && isWarmOriginal(evidence),
+  applies: (evidence) => evidence.scaleType === 'sequential' && isWarmOriginal(evidence),
 });
 
 export const swapToPlasma = buildSchemeSwap({
@@ -295,8 +285,7 @@ export const swapToPlasma = buildSchemeSwap({
     'progression. Higher dynamic range than magma; good for warm palettes ' +
     'where contrast at the bright end matters.',
   schemeName: 'plasma',
-  applies: (evidence) =>
-    evidence.scaleType === 'sequential' && isWarmOriginal(evidence),
+  applies: (evidence) => evidence.scaleType === 'sequential' && isWarmOriginal(evidence),
 });
 
 // ─── Categorical recommendations ────────────────────────────────
@@ -310,8 +299,7 @@ export const swapToTableau10 = buildSchemeSwap({
     'Stays CVD-safe up to about seven categories.',
   schemeName: 'tableau10',
   applies: (evidence) =>
-    evidence.scaleType === 'categorical' &&
-    isUnderSafeLimit('tableau10', evidence.usedCategoryCount),
+    evidence.scaleType === 'categorical' && isUnderSafeLimit('tableau10', evidence.usedCategoryCount),
 });
 
 export const swapToSet2 = buildSchemeSwap({
@@ -322,9 +310,7 @@ export const swapToSet2 = buildSchemeSwap({
     'three categories; past that, protanopia collapses one pair. Best ' +
     'when the original design was non-vibrant and a softer palette fits.',
   schemeName: 'set2',
-  applies: (evidence) =>
-    evidence.scaleType === 'categorical' &&
-    isUnderSafeLimit('set2', evidence.usedCategoryCount),
+  applies: (evidence) => evidence.scaleType === 'categorical' && isUnderSafeLimit('set2', evidence.usedCategoryCount),
 });
 
 export const swapToDark2 = buildSchemeSwap({
@@ -335,9 +321,7 @@ export const swapToDark2 = buildSchemeSwap({
     'up to about six categories. Best when the original design was ' +
     'vibrant and you want to keep strong colour separation.',
   schemeName: 'dark2',
-  applies: (evidence) =>
-    evidence.scaleType === 'categorical' &&
-    isUnderSafeLimit('dark2', evidence.usedCategoryCount),
+  applies: (evidence) => evidence.scaleType === 'categorical' && isUnderSafeLimit('dark2', evidence.usedCategoryCount),
 });
 
 export const swapToObservable10 = buildSchemeSwap({
@@ -349,8 +333,7 @@ export const swapToObservable10 = buildSchemeSwap({
     'Modern, well-balanced between vibrancy and discriminability.',
   schemeName: 'observable10',
   applies: (evidence) =>
-    evidence.scaleType === 'categorical' &&
-    isUnderSafeLimit('observable10', evidence.usedCategoryCount),
+    evidence.scaleType === 'categorical' && isUnderSafeLimit('observable10', evidence.usedCategoryCount),
 });
 
 export const swapToOkabeIto = buildRangeSwap({
@@ -392,7 +375,7 @@ export const swapToRedBlue = buildSchemeSwap({
   id: 'cvd-swap-to-redblue',
   label: 'Switch to redblue',
   description:
-    'Classic diverging palette (red-white-blue). Reasonably CVD-safe — ' +
+    'Classic diverging palette (red-white-blue). Reasonably CVD-safe - ' +
     'the red and blue ends remain distinguishable for protanopia and ' +
     'deuteranopia, though weaker for tritanopia than blue-orange.',
   schemeName: 'redblue',
@@ -419,12 +402,12 @@ export const colorblindSafetyRecommendations: Recommendation[] = [
   swapToTurbo,
   swapToMagma,
   swapToPlasma,
-  // Categorical — Vega-registered schemes first
+  // Categorical - Vega-registered schemes first
   swapToTableau10,
   swapToSet2,
   swapToDark2,
   swapToObservable10,
-  // Categorical — hand-picked, guaranteed-safe palettes
+  // Categorical - hand-picked, guaranteed-safe palettes
   swapToOkabeIto,
   swapToWong,
   // Diverging
@@ -439,9 +422,6 @@ export const colorblindSafetyRecommendations: Recommendation[] = [
  * Backward-compatibility shim for the v1 API. Returns the
  * recommendation's static description.
  */
-export function describeCvdRecommendation(
-  recommendation: Recommendation,
-  _issue: AccessibilityIssue,
-): string {
+export function describeCvdRecommendation(recommendation: Recommendation, _issue: AccessibilityIssue): string {
   return recommendation.description;
 }

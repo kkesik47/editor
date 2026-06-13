@@ -7,14 +7,14 @@
  * an accessibility issue. Each rule may have several recommendations
  * per issue, representing different trade-offs an author might make:
  *
- *   - replacement  — swap in a better-by-default value (e.g. viridis)
- *   - adjustment   — tune the existing value just enough (e.g. nudge L*)
- *   - redundancy   — add another channel so the broken one matters less
- *   - augmentation — add an outline/halo without changing colors
- *   - restructure  — change the encoding type (e.g. quantize)
+ *   - replacement  - swap in a better-by-default value (e.g. viridis)
+ *   - adjustment   - tune the existing value just enough (e.g. nudge L*)
+ *   - redundancy   - add another channel so the broken one matters less
+ *   - augmentation - add an outline/halo without changing colors
+ *   - restructure  - change the encoding type (e.g. quantize)
  *
  * Authors pick based on what they want to preserve (palette, mark
- * type, design intent). The engine surfaces all applicable options —
+ * type, design intent). The engine surfaces all applicable options -
  * it doesn't choose for the author.
  */
 
@@ -29,16 +29,11 @@ export type VegaLiteSpec = Record<string, unknown>;
 
 /**
  * Family classification for a recommendation, used in writeups and
- * (eventually) for grouping in the UI. Not currently displayed —
+ * (eventually) for grouping in the UI. Not currently displayed -
  * present so each recommendation declares its strategic intent
  * for documentation purposes.
  */
-export type RecommendationFamily =
-  | 'replacement'
-  | 'adjustment'
-  | 'redundancy'
-  | 'augmentation'
-  | 'restructure';
+export type RecommendationFamily = 'replacement' | 'adjustment' | 'redundancy' | 'augmentation' | 'restructure';
 
 export interface Recommendation {
   /** Stable identifier, e.g. 'cvd-swap-sequential-scheme'. */
@@ -60,14 +55,14 @@ export interface Recommendation {
   /**
    * Returns true when this recommendation can sensibly be applied to
    * the given issue in the given spec. Used by the UI to filter out
-   * recommendations that don't fit the current context — e.g. "add
+   * recommendations that don't fit the current context - e.g. "add
    * shape encoding" is not applicable to bar charts.
    */
   applicableWhen: (issue: AccessibilityIssue, spec: VegaLiteSpec) => boolean;
 
   /**
    * Returns a NEW spec with the recommendation applied.
-   * The original spec is not mutated — mutators deep-clone before editing.
+   * The original spec is not mutated - mutators deep-clone before editing.
    */
   apply: (issue: AccessibilityIssue, spec: VegaLiteSpec) => VegaLiteSpec;
 }

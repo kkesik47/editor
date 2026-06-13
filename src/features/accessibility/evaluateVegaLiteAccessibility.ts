@@ -59,7 +59,7 @@ function deduplicateColorIssues(issues: AccessibilityIssue[]): AccessibilityIssu
  *
  * This only runs on colorRiskRule issues that survived deduplication
  * (i.e., ones where the CVD simulation rule did NOT also flag the
- * same scale — because those already have their own previews).
+ * same scale - because those already have their own previews).
  */
 function enrichWithCvdPreview(issues: AccessibilityIssue[]): AccessibilityIssue[] {
   return issues.map((issue) => {

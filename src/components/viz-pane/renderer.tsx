@@ -131,7 +131,7 @@ const VizPane: React.FC<VizPaneProps> = (props) => {
    *
    *  The Accessibility pane is handled BEFORE the `props.view` check
    *  because, unlike the other viewers, it doesn't depend on a
-   *  rendered Vega view — it only needs the spec-level
+   *  rendered Vega view - it only needs the spec-level
    *  `accessibilityIssues` list, which is available even when the
    *  view is unavailable (e.g., empty spec).
    */

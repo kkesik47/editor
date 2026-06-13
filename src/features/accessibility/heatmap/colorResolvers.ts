@@ -3,9 +3,9 @@
  *
  * Locates the colour- and contrast-related rules on the rendered chart.
  *
- * Every colour-scale rule — colourblind safety, colour risk, lightness
+ * Every colour-scale rule - colourblind safety, colour risk, lightness
  * contrast, perceptual uniformity, colour-only encoding, and non-text
- * contrast — is fundamentally about the colours a scale assigns to the
+ * contrast - is fundamentally about the colours a scale assigns to the
  * data. Those colours appear in exactly two places:
  *
  *   1. the data marks themselves (role 'mark'), and
@@ -38,7 +38,7 @@ import {markGroupIndicesForIssue, collectMarkGroupBounds, clipBoxesToMarkGroups}
  * size, glyph for shape), so the varying property names the channel.
  *
  * Used to filter legends to those that match the channel an issue
- * is about — so a /encoding/color issue doesn't paint blobs on the
+ * is about - so a /encoding/color issue doesn't paint blobs on the
  * sibling size or shape legend.
  */
 type LegendChannel = 'color' | 'size' | 'shape' | 'opacity' | 'unknown';
@@ -71,18 +71,10 @@ function detectLegendChannel(legend: SceneItem): LegendChannel {
  * Walk the scenegraph and collect legend-entry boxes only from
  * legends whose channel is in `keepChannels`.
  */
-function collectLegendEntriesByChannel(
-  root: SceneItem,
-  keepChannels: Set<LegendChannel>,
-): BoundingBox[] {
+function collectLegendEntriesByChannel(root: SceneItem, keepChannels: Set<LegendChannel>): BoundingBox[] {
   const out: BoundingBox[] = [];
 
-  const visit = (
-    item: SceneItem,
-    offsetX: number,
-    offsetY: number,
-    inMatchingLegend: boolean,
-  ): void => {
+  const visit = (item: SceneItem, offsetX: number, offsetY: number, inMatchingLegend: boolean): void => {
     let nextInside = inMatchingLegend;
 
     if (item.role === 'legend') {
@@ -113,7 +105,7 @@ function collectLegendEntriesByChannel(
 
 /**
  * True when the issue's pointer addresses a `condition.value`
- * fallback — i.e. a `/value` whose sibling node carries a
+ * fallback - i.e. a `/value` whose sibling node carries a
  * `condition`. Those colours only paint when the predicate fails
  * (default-empty selections match everything, so the marks/legend
  * render with the condition's scale, not this value). Surfacing a
@@ -121,10 +113,7 @@ function collectLegendEntriesByChannel(
  * elements that don't actually show the colour. The issue still
  * appears in Monaco and the accessibility pane, where it belongs.
  */
-function isConditionalValueFallback(
-  pointer: string,
-  spec: Record<string, unknown>,
-): boolean {
+function isConditionalValueFallback(pointer: string, spec: Record<string, unknown>): boolean {
   if (!pointer.endsWith('/value')) return false;
   const segments = pointer.split('/').filter(Boolean);
   segments.pop(); // drop 'value'

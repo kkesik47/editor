@@ -8,7 +8,7 @@
  * Why this exists: several rules legitimately point at the same place.
  * A red/green nominal scale, for instance, trips colour-risk AND
  * colourblind-safety, and both resolve to the same marks + legend
- * boxes. Drawn raw, those identical rectangles just pile up — you can't
+ * boxes. Drawn raw, those identical rectangles just pile up - you can't
  * tell "three issues here" from "one strong issue", and only the
  * topmost catches the mouse, so the ones beneath are unreachable.
  *
@@ -18,7 +18,7 @@
  * line, not just one).
  *
  * The count also feeds the heatmap aesthetic: a cluster with more
- * issues is drawn more intensely — the literal "hot spot" reading.
+ * issues is drawn more intensely - the literal "hot spot" reading.
  */
 
 import type {AccessibilityIssue} from '../types.js';
@@ -31,7 +31,7 @@ import type {IssueRegion, RegionKind} from './resolvers.js';
  * test during clustering. Adjacent marks (neighbouring scatter
  * points, sibling bars) then merge into one cluster instead of each
  * becoming its own tiny blob with its own badge. Text regions don't
- * inflate — labels and titles must stay distinct or the badge sits
+ * inflate - labels and titles must stay distinct or the badge sits
  * between them and the chart reads as "everything is one issue".
  */
 const MARK_CLUSTER_PADDING = 10;
@@ -39,7 +39,7 @@ const MARK_CLUSTER_PADDING = 10;
 export type Severity = 'warning' | 'info';
 
 export interface IssueCluster {
-  /** Union of all member boxes — used to place the badge. */
+  /** Union of all member boxes - used to place the badge. */
   box: BoundingBox;
   /**
    * Individual member boxes after deduplication. One blob is drawn
@@ -52,7 +52,7 @@ export interface IssueCluster {
   issues: AccessibilityIssue[];
   /** Their keys, for coordinating hover with the editor and pane. */
   keys: string[];
-  /** Worst severity among members — drives the blob colour. */
+  /** Worst severity among members - drives the blob colour. */
   severity: Severity;
   /**
    * Whether this cluster paints marks or text. Drives inflation
@@ -60,7 +60,7 @@ export interface IssueCluster {
    * during rendering (text paints on top of marks).
    */
   kind: RegionKind;
-  /** How many distinct issues — drives blob intensity and the badge. */
+  /** How many distinct issues - drives blob intensity and the badge. */
   count: number;
 }
 
@@ -87,17 +87,15 @@ function worse(a: Severity, b: Severity): Severity {
 /** Inflate mark regions before the overlap test so adjacent marks
  *  merge; leave text regions untouched. */
 function clusterBoxOf(region: IssueRegion): BoundingBox {
-  return region.kind === 'mark'
-    ? inflateBox(region.box, MARK_CLUSTER_PADDING)
-    : region.box;
+  return region.kind === 'mark' ? inflateBox(region.box, MARK_CLUSTER_PADDING) : region.box;
 }
 
 /**
  * Pointer-shape priority for what a cluster click should jump to.
  *
- * When several contrast issues land in one cluster — typically a
+ * When several contrast issues land in one cluster - typically a
  * `condition.value` lightgray fallback alongside failing
- * `condition.scale.range` colours on the same marks — we want
+ * `condition.scale.range` colours on the same marks - we want
  * `keys[0]` to be the issue that matches the marks' currently
  * rendered colours. The value fallback only manifests under
  * interaction (a selection actively excluding items); the scale
@@ -170,7 +168,7 @@ export function clusterRegions(regions: IssueRegion[]): IssueCluster[] {
 /**
  * Warnings take visual precedence over suggestions OF THE SAME KIND.
  * Where a mark-warning and a mark-suggestion land on the same spot,
- * drawing both muddies them into grey — so the mark-suggestion is
+ * drawing both muddies them into grey - so the mark-suggestion is
  * hidden. A text-suggestion on a label paints something different
  * from the mark blob underneath and shouldn't be hidden by it, so
  * we restrict the suppression to same-kind warnings.
@@ -189,8 +187,5 @@ export function orderByPrecedence(clusters: IssueCluster[]): IssueCluster[] {
   );
 
   const all = [...visibleSuggestions, ...warnings];
-  return [
-    ...all.filter((c) => c.kind === 'mark'),
-    ...all.filter((c) => c.kind === 'text'),
-  ];
+  return [...all.filter((c) => c.kind === 'mark'), ...all.filter((c) => c.kind === 'text')];
 }

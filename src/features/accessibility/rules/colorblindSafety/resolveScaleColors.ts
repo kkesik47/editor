@@ -1,17 +1,17 @@
 /**
  * resolveScaleColors.ts
  *
- * Walks a Vega-Lite specification to find color scales — both
+ * Walks a Vega-Lite specification to find color scales - both
  * EXPLICIT (where the author has set encoding.<channel>.scale) and
  * IMPLICIT (where no scale is written and Vega-Lite falls back to a
  * default scheme based on field type and mark type). For each
  * scale, resolves a concrete array of CSS colour strings.
  *
  * Handles four specification forms:
- *   1. scale.range  — a literal array of color strings
- *   2. scale.scheme — a string naming a Vega/D3 color scheme
- *   3. scale.scheme — an object { name, count?, extent? }
- *   4. No explicit colours — synthesise the Vega-Lite default
+ *   1. scale.range  - a literal array of color strings
+ *   2. scale.scheme - a string naming a Vega/D3 color scheme
+ *   3. scale.scheme - an object { name, count?, extent? }
+ *   4. No explicit colours - synthesise the Vega-Lite default
  *      (e.g. nominal → tableau10, quant+rect → viridis); authors
  *      can override these via config.range.*
  * Continuous/sequential schemes are sampled at evenly-spaced points.
@@ -28,10 +28,10 @@
  * domain size and slice the resolved color list accordingly. Sources
  * for the domain size, in priority order:
  *
- *   1. scale.domain  — explicit array, length is authoritative
- *   2. Data inspection — for nominal fields, count distinct values
+ *   1. scale.domain  - explicit array, length is authoritative
+ *   2. Data inspection - for nominal fields, count distinct values
  *      of the encoded field in spec.data.values
- *   3. Fallback — keep the full scheme (the safer default; better to
+ *   3. Fallback - keep the full scheme (the safer default; better to
  *      false-positive than to miss real issues for unknown sources)
  *
  * For sequential / diverging scales we never slice. They are
@@ -59,7 +59,7 @@ export type ScaleType = 'categorical' | 'sequential' | 'diverging';
 export interface ResolvedScale {
   /** The concrete CSS color strings the scale will render. */
   colors: string[];
-  /** Categorical / sequential / diverging — controls which checks apply. */
+  /** Categorical / sequential / diverging - controls which checks apply. */
   scaleType: ScaleType;
   /** JSON Pointer to the scale property (for editor underlines). */
   jsonPointer: string;
@@ -77,7 +77,7 @@ export interface ResolvedScale {
    * True when the scale was synthesised from Vega-Lite's default
    * because no scale block was written. Affects editor underline
    * (no value to highlight, so the channel key is underlined
-   * instead — see colorblindSafetyRule.buildIssues).
+   * instead - see colorblindSafetyRule.buildIssues).
    */
   isImplicit?: boolean;
 }
@@ -133,7 +133,7 @@ function isDivergingScheme(name: unknown): boolean {
 
 /** Options controlling how a named scheme is resolved to concrete colors. */
 interface ResolveSchemeOptions {
-  /** Categorical / sequential / diverging — decides the sampling strategy. */
+  /** Categorical / sequential / diverging - decides the sampling strategy. */
   scaleType: ScaleType;
   /**
    * For categorical scales, how many categories the data actually uses.
@@ -161,10 +161,7 @@ interface ResolveSchemeOptions {
  * Discrete schemes (tableau10, …) are plain arrays; trimming them to the
  * used category count happens later, in maybeSliceCategorical.
  */
-function resolveNamedScheme(
-  name: string,
-  opts: ResolveSchemeOptions,
-): string[] | null {
+function resolveNamedScheme(name: string, opts: ResolveSchemeOptions): string[] | null {
   let schemeValue: unknown;
 
   try {
@@ -202,11 +199,7 @@ function resolveNamedScheme(
   return null;
 }
 
-function sampleInterpolator(
-  interpolator: (t: number) => string,
-  count?: number,
-  extent?: [number, number],
-): string[] {
+function sampleInterpolator(interpolator: (t: number) => string, count?: number, extent?: [number, number]): string[] {
   const n = count ?? DEFAULT_CONTINUOUS_SAMPLES;
   const [lo, hi] = extent ?? [0, 1];
 
@@ -222,7 +215,7 @@ function sampleInterpolator(
  * t = (i + 1) / (count + 1).
  *
  * The crucial detail is that Vega skips the t = 0 and t = 1 endpoints, so
- * categorical colors never land on the extreme ends of a scheme — which
+ * categorical colors never land on the extreme ends of a scheme - which
  * are often near-black or near-white, or (for the cyclical "rainbow"
  * scheme) the same purple at both ends. Reproducing this spacing is what
  * makes our resolved colors match the swatches Vega actually renders:
@@ -232,13 +225,8 @@ function sampleInterpolator(
  * Verified against vega-lite v6 for the rainbow and viridis schemes,
  * category counts 2–7.
  */
-function sampleCategoricalInterpolator(
-  interpolator: (t: number) => string,
-  count: number,
-): string[] {
-  return Array.from({length: count}, (_, i) =>
-    interpolator((i + 1) / (count + 1)),
-  );
+function sampleCategoricalInterpolator(interpolator: (t: number) => string, count: number): string[] {
+  return Array.from({length: count}, (_, i) => interpolator((i + 1) / (count + 1)));
 }
 
 function resolveDiscreteScheme(schemeValue: unknown[], count?: number): string[] | null {
@@ -270,25 +258,22 @@ function resolveDiscreteScheme(schemeValue: unknown[], count?: number): string[]
  * for the given encoding channel.
  *
  * Priority:
- *   1. scale.domain    — explicit array of category labels.
- *   2. Inline data     — count distinct values of channelDef.field
+ *   1. scale.domain    - explicit array of category labels.
+ *   2. Inline data     - count distinct values of channelDef.field
  *                        in spec.data.values.
  *
  * Returns null when the domain size cannot be reliably determined
  * (data is loaded from a URL, the field isn't named, etc.). Callers
  * should keep the full scheme in that case.
  */
-function resolveCategoryCount(
-  spec: Record<string, unknown>,
-  channelDef: Record<string, unknown>,
-): number | null {
+function resolveCategoryCount(spec: Record<string, unknown>, channelDef: Record<string, unknown>): number | null {
   // 1. Explicit scale.domain
   const scale = channelDef.scale as Record<string, unknown> | undefined;
   if (Array.isArray(scale?.domain)) {
     return (scale!.domain as unknown[]).length;
   }
 
-  // 2. Inline data — count distinct values of the encoded field
+  // 2. Inline data - count distinct values of the encoded field
   const fieldName = channelDef.field;
   if (typeof fieldName !== 'string') return null;
 
@@ -329,10 +314,10 @@ function resolveCategoryCount(
  * vega-lite/docs/scale.html#default-color.
  */
 const IMPLICIT_DEFAULT_SCHEMES = {
-  category:  'tableau10',
-  ordinal:   'blues',
-  ramp:      'blues',
-  heatmap:   'viridis',
+  category: 'tableau10',
+  ordinal: 'blues',
+  ramp: 'blues',
+  heatmap: 'viridis',
   diverging: 'blueorange',
 } as const;
 
@@ -344,13 +329,13 @@ function pickRangeKey(
   markType: string | null,
   scaleType: ScaleType,
 ): RangeKey | null {
-  if ('value' in channelDef) return null;          // {value: "#f00"} → no scale
+  if ('value' in channelDef) return null; // {value: "#f00"} → no scale
   const fieldType = channelDef.type;
-  if (typeof fieldType !== 'string') return null;  // can't infer without a type
+  if (typeof fieldType !== 'string') return null; // can't infer without a type
 
   if (scaleType === 'diverging') return 'diverging';
-  if (fieldType === 'nominal')   return 'category';
-  if (fieldType === 'ordinal')   return 'ordinal';
+  if (fieldType === 'nominal') return 'category';
+  if (fieldType === 'ordinal') return 'ordinal';
   if (fieldType === 'quantitative' || fieldType === 'temporal') {
     return markType === 'rect' ? 'heatmap' : 'ramp';
   }
@@ -373,8 +358,9 @@ function synthesizeImplicitScheme(
 
   // 1. Author override in config.range.<key> (either a string scheme
   //    name or an object form like { scheme: "set2" }).
-  const configRange = (spec.config as Record<string, unknown> | undefined)
-    ?.range as Record<string, unknown> | undefined;
+  const configRange = (spec.config as Record<string, unknown> | undefined)?.range as
+    | Record<string, unknown>
+    | undefined;
   const override = configRange?.[key];
   if (typeof override === 'string') return override;
   if (override && typeof override === 'object' && !Array.isArray(override)) {
@@ -402,7 +388,7 @@ function resolveMarkType(node: Record<string, unknown>): string | null {
 function inferScaleType(encodingDef: Record<string, unknown>): ScaleType {
   const fieldType = encodingDef?.type;
 
-  // Nominal fields are always categorical — even with a diverging palette,
+  // Nominal fields are always categorical - even with a diverging palette,
   // the individual categories are unordered and need pairwise checks.
   if (fieldType === 'nominal') return 'categorical';
 
@@ -418,9 +404,7 @@ function inferScaleType(encodingDef: Record<string, unknown>): ScaleType {
     if (scale.domainMid != null) return 'diverging';
 
     const schemeName =
-      typeof scale.scheme === 'string'
-        ? scale.scheme
-        : (scale.scheme as Record<string, unknown> | undefined)?.name;
+      typeof scale.scheme === 'string' ? scale.scheme : (scale.scheme as Record<string, unknown> | undefined)?.name;
     if (isDivergingScheme(schemeName)) return 'diverging';
   }
 
@@ -444,7 +428,7 @@ function inferScaleType(encodingDef: Record<string, unknown>): ScaleType {
  * colors (see resolveNamedScheme), so the slice below is a no-op for
  * them; it still trims discrete schemes and explicit ranges.
  *
- * Sequential / diverging scales are never sliced — see file header.
+ * Sequential / diverging scales are never sliced - see file header.
  */
 function maybeSliceCategorical(
   scaleType: ScaleType,
@@ -465,12 +449,7 @@ function maybeSliceCategorical(
 
 // ─── Spec walker ─────────────────────────────────────────────────
 
-function walkSpec(
-  spec: Record<string, unknown>,
-  node: unknown,
-  pointer: string,
-  results: ResolvedScale[],
-): void {
+function walkSpec(spec: Record<string, unknown>, node: unknown, pointer: string, results: ResolvedScale[]): void {
   if (!node || typeof node !== 'object') return;
 
   if (Array.isArray(node)) {
@@ -509,26 +488,28 @@ function extractScalesFromEncoding(
     const channelDef = encoding[channel] as Record<string, unknown> | undefined;
     if (!channelDef || typeof channelDef !== 'object') continue;
 
-    extractFromChannelDef(
-      spec, channelDef,
-      `${pointer}/encoding/${channel}`,
-      channel, markType, results,
-    );
+    extractFromChannelDef(spec, channelDef, `${pointer}/encoding/${channel}`, channel, markType, results);
 
     const condition = channelDef.condition;
     if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
       extractFromChannelDef(
-        spec, condition as Record<string, unknown>,
+        spec,
+        condition as Record<string, unknown>,
         `${pointer}/encoding/${channel}/condition`,
-        channel, markType, results,
+        channel,
+        markType,
+        results,
       );
     } else if (Array.isArray(condition)) {
       condition.forEach((c, i) => {
         if (c && typeof c === 'object') {
           extractFromChannelDef(
-            spec, c as Record<string, unknown>,
+            spec,
+            c as Record<string, unknown>,
             `${pointer}/encoding/${channel}/condition/${i}`,
-            channel, markType, results,
+            channel,
+            markType,
+            results,
           );
         }
       });
@@ -537,7 +518,7 @@ function extractScalesFromEncoding(
 }
 
 /**
- * Extract a scale from one channelDef-shaped object — either the
+ * Extract a scale from one channelDef-shaped object - either the
  * channel itself or a `condition` block, both of which can carry
  * the same trio of `field` / `type` / `scale` properties.
  *
@@ -559,17 +540,14 @@ function extractFromChannelDef(
   results: ResolvedScale[],
 ): void {
   const scaleType = inferScaleType(channelDef);
-  const categoryCount =
-    scaleType === 'categorical' ? resolveCategoryCount(spec, channelDef) : null;
+  const categoryCount = scaleType === 'categorical' ? resolveCategoryCount(spec, channelDef) : null;
 
   const scale = channelDef.scale as Record<string, unknown> | undefined;
   const basePointer = `${baseChannelPointer}/scale`;
 
   // ── Case 1: scale.range is a literal array of colors ──
   if (scale && Array.isArray(scale.range)) {
-    const colors = (scale.range as unknown[]).filter(
-      (c): c is string => typeof c === 'string',
-    );
+    const colors = (scale.range as unknown[]).filter((c): c is string => typeof c === 'string');
     if (colors.length >= 2) {
       const sliced = maybeSliceCategorical(scaleType, colors, categoryCount);
       if (sliced.colors.length >= 2) {
@@ -605,10 +583,7 @@ function extractFromChannelDef(
   }
 
   // ── Case 3: scale.scheme is an object { name, count?, extent? } ──
-  if (
-    scale && scale.scheme &&
-    typeof scale.scheme === 'object' && !Array.isArray(scale.scheme)
-  ) {
+  if (scale && scale.scheme && typeof scale.scheme === 'object' && !Array.isArray(scale.scheme)) {
     const schemeObj = scale.scheme as Record<string, unknown>;
     const name = schemeObj.name;
     if (typeof name !== 'string') return;
@@ -636,15 +611,15 @@ function extractFromChannelDef(
     return;
   }
 
-  // ── Case 4: no explicit colours — synthesise Vega-Lite's default ──
+  // ── Case 4: no explicit colours - synthesise Vega-Lite's default ──
   //
   // Without this branch the rule would skip every chart whose colour
-  // channel relies on the implicit default scheme — the most common
+  // channel relies on the implicit default scheme - the most common
   // case in the wild. The default is looked up from `config.range.<key>`
   // when the author has overridden it, otherwise from the hardcoded
   // Vega-Lite mapping in IMPLICIT_DEFAULT_SCHEMES above.
   //
-  // The pointer is the channel itself (no `/scale` suffix) — there is
+  // The pointer is the channel itself (no `/scale` suffix) - there is
   // no scale block to underline; the issue surfaces on the channel key.
   const implicitName = synthesizeImplicitScheme(spec, channelDef, markType, scaleType);
   if (implicitName) {

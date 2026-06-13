@@ -41,7 +41,7 @@ interface IndexedIssue {
 
 /**
  * Partition issues by severity, preserving each issue's original
- * index. Order within each group is preserved from the input —
+ * index. Order within each group is preserved from the input -
  * `evaluateVegaLiteAccessibility` already sorts by rule priority, so
  * we want to keep that ordering inside each group.
  */
@@ -73,7 +73,7 @@ function partitionBySeverity(issues: AccessibilityIssue[]): {
  * scroll-position stability in the common case.
  *
  * NB: this MUST stay identical to the heatmap's `issueKey`
- * (src/features/accessibility/heatmap/issueKey.ts) — the two are
+ * (src/features/accessibility/heatmap/issueKey.ts) - the two are
  * matched against each other to coordinate hover and click-jump.
  */
 function issueKey(issue: AccessibilityIssue, index: number): string {
@@ -86,7 +86,7 @@ function issueKey(issue: AccessibilityIssue, index: number): string {
  * Collapsible "References" section listing the full APA citations
  * with clickable DOI links.
  *
- * The collapsed state is just "References (N) ▸" — the inline
+ * The collapsed state is just "References (N) ▸" - the inline
  * citations already appear in the message above, so the toggle
  * doesn't need to repeat the short citations. Expanding reveals
  * the full bibliographic entries with type badges and links
@@ -118,12 +118,7 @@ function IssueReferences({references}: {references: Reference[]}) {
         <ul className="a11y-issue-references-list">
           {references.map((ref) => (
             <li key={ref.id} className="a11y-issue-reference">
-              <a
-                href={ref.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="a11y-issue-reference-link"
-              >
+              <a href={ref.url} target="_blank" rel="noopener noreferrer" className="a11y-issue-reference-link">
                 {ref.fullCitation}
               </a>
             </li>
@@ -135,7 +130,7 @@ function IssueReferences({references}: {references: Reference[]}) {
 }
 
 /**
- * Recommendations section — actionable, machine-applicable fixes.
+ * Recommendations section - actionable, machine-applicable fixes.
  *
  * Each recommendation is rendered as a button with a label and a
  * trade-off description. Clicking applies the fix to a clone of the
@@ -162,15 +157,9 @@ function IssueRecommendations({
       <ul className="a11y-recommendation-list">
         {recommendations.map((rec) => (
           <li key={rec.id}>
-            <button
-              type="button"
-              className="a11y-recommendation"
-              onClick={() => onApply(rec, issue)}
-            >
+            <button type="button" className="a11y-recommendation" onClick={() => onApply(rec, issue)}>
               <strong className="a11y-recommendation-label">{rec.label}</strong>
-              <span className="a11y-recommendation-description">
-                {describeCvdRecommendation(rec, issue)}
-              </span>
+              <span className="a11y-recommendation-description">{describeCvdRecommendation(rec, issue)}</span>
             </button>
           </li>
         ))}
@@ -247,11 +236,7 @@ function IssueCard({
           ))}
         </div>
       )}
-      <IssueRecommendations
-        issue={issue}
-        recommendations={recommendations}
-        onApply={onApplyRecommendation}
-      />
+      <IssueRecommendations issue={issue} recommendations={recommendations} onApply={onApplyRecommendation} />
       <IssueReferences references={references} />
     </li>
   );
@@ -277,7 +262,7 @@ function SectionHeaderSuggestion({title, count}: {title: string; count: number})
 }
 
 /**
- * Empty state — shown when the linter produced no issues.
+ * Empty state - shown when the linter produced no issues.
  *
  * Honest framing: we tell the user we found nothing AND that the
  * linter only covers what it knows how to check, so absence of
@@ -369,7 +354,7 @@ const AccessibilityPaneRenderer: React.FC<AccessibilityPaneRendererProps> = ({is
   // effect would not re-run).
   //
   // `block: 'nearest'` means we only scroll when the card is actually
-  // off-screen — no jolt if it's already visible. The requestAnimation-
+  // off-screen - no jolt if it's already visible. The requestAnimation-
   // Frame defers one frame so the pane (which may have just been
   // revealed via `debugPane: true` on the same click) has laid out
   // before we measure. The 1.2s timeout matches the flash animation so

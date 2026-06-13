@@ -15,7 +15,7 @@
  *
  * Categorical scales are not covered: the lightness rule does not
  * apply to them (qualitative palettes trade lightness uniformity for
- * hue diversity by design — Brewer 2003; Wong 2011), so no
+ * hue diversity by design - Brewer 2003; Wong 2011), so no
  * categorical issues are emitted and no recommendations are needed.
  *
  * ─── Trade-off space ─────────────────────────────────────────────
@@ -24,7 +24,7 @@
  * "Nudge a narrow range wider" or "remove a lightness reversal"
  * can't be expressed as a targeted edit; they're palette
  * redesigns. So we offer named replacements whose lightness
- * profile is GUARANTEED good — each candidate is verified using
+ * profile is GUARANTEED good - each candidate is verified using
  * the rule's own analysis functions (see lightnessAdjust.ts).
  *
  * ─── Why "guaranteed safe" matters here ──────────────────────────
@@ -32,7 +32,7 @@
  * Lightness safety is a different property from CVD safety. A scheme
  * can be CVD-safe but lightness-poor, or vice versa. So we can't
  * just reuse `colorblindSafetyRecs.ts` candidate list and assume the
- * same recommendations work — each candidate is re-checked against
+ * same recommendations work - each candidate is re-checked against
  * the *lightness* rule's actual thresholds.
  */
 
@@ -68,7 +68,6 @@ function readLightnessEvidence(issue: AccessibilityIssue): LightnessEvidence | n
   return {scaleType, schemeName, originalColors};
 }
 
-
 // ─── Sequential / diverging: catalogue scheme swaps ─────────────
 
 /**
@@ -93,10 +92,7 @@ function buildSchemeSwapRec(args: {
       if (!ev) return false;
       if (ev.scaleType !== args.schemeType) return false;
       // Don't offer to swap to the same scheme the chart already uses.
-      if (
-        ev.schemeName &&
-        ev.schemeName.toLowerCase().replace(/-\d+$/, '') === args.schemeName
-      ) {
+      if (ev.schemeName && ev.schemeName.toLowerCase().replace(/-\d+$/, '') === args.schemeName) {
         return false;
       }
 
@@ -109,7 +105,7 @@ function buildSchemeSwapRec(args: {
 
     apply(issue, spec) {
       // The pointer addresses scale.range or scale.scheme; its parent
-      // is the scale object — same shape as colorblindSafetyRecs and
+      // is the scale object - same shape as colorblindSafetyRecs and
       // contrastRecs.
       return setScheme(spec, parentPointer(issue.jsonPointer), args.schemeName);
     },
@@ -121,7 +117,7 @@ function buildSchemeSwapRec(args: {
 // One rec per candidate scheme. `applicableWhen` filters them to
 // the right scale type per issue and verifies each is actually safe
 // for the current chart (e.g. correct category count). The list is
-// deliberately broader than colorblindSafetyRecs' — we want to give
+// deliberately broader than colorblindSafetyRecs' - we want to give
 // the lightness check a fair chance to find candidates, and the
 // per-rec safety check makes false positives impossible.
 //
@@ -139,7 +135,7 @@ const CANDIDATES: {name: string; type: 'sequential' | 'diverging'; description: 
     type: 'sequential',
     description:
       'Perceptually uniform sequential palette with a wide, monotonic ' +
-      'lightness range. Strong neutral default — readable in grayscale ' +
+      'lightness range. Strong neutral default - readable in grayscale ' +
       'and CVD-safe as a bonus.',
   },
   {
@@ -162,15 +158,12 @@ const CANDIDATES: {name: string; type: 'sequential' | 'diverging'; description: 
     name: 'inferno',
     type: 'sequential',
     description:
-      'Similar to magma with a slightly higher dynamic range. Good for ' +
-      'data where the bright end matters most.',
+      'Similar to magma with a slightly higher dynamic range. Good for ' + 'data where the bright end matters most.',
   },
   {
     name: 'plasma',
     type: 'sequential',
-    description:
-      'Perceptually uniform sequential palette with a magenta-to-yellow ' +
-      'progression.',
+    description: 'Perceptually uniform sequential palette with a magenta-to-yellow ' + 'progression.',
   },
 
   // ── Diverging ────────────────────────────────────────────────
@@ -185,8 +178,7 @@ const CANDIDATES: {name: string; type: 'sequential' | 'diverging'; description: 
     name: 'redblue',
     type: 'diverging',
     description:
-      'Classic red-white-blue diverging palette. Each half has a steady ' +
-      'lightness change toward its endpoint.',
+      'Classic red-white-blue diverging palette. Each half has a steady ' + 'lightness change toward its endpoint.',
   },
   {
     name: 'purpleorange',
@@ -233,7 +225,7 @@ function getSchemeSwapRecommendations(): Recommendation[] {
 // ─── Registry ────────────────────────────────────────────────────
 
 export const lightnessContrastRecommendations: Recommendation[] = [
-  // Catalogue scheme swaps for sequential and diverging shapes —
+  // Catalogue scheme swaps for sequential and diverging shapes -
   // the safety filter routes each candidate to the right issue.
   ...getSchemeSwapRecommendations(),
 ];

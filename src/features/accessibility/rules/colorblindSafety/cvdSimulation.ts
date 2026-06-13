@@ -26,7 +26,7 @@
  *   Why no adjacent check for sequential?
  *   Adjacent samples from a high-density sampling (16 points) are
  *   only ~6% of the range apart. Even CVD-safe schemes like viridis
- *   have small ΔE between neighbors at that density — that's normal
+ *   have small ΔE between neighbors at that density - that's normal
  *   gradient behavior, not a defect.
  *
  * References:
@@ -107,12 +107,12 @@ export const CATEGORICAL_THRESHOLD = 5;
  *
  * Any two data values ≥25% of the range apart must remain clearly
  * different under CVD.  If they collapse, the user cannot read the
- * scale — two distant data values appear identical.
+ * scale - two distant data values appear identical.
  *
  * We use 7 rather than 10 because:
  *   - ΔE 7 is well above "clearly different" (>5)
  *   - CVD-safe schemes like plasma have worst-case distant-pair
- *     ΔE around 8 under protanopia — threshold 10 false-positives them
+ *     ΔE around 8 under protanopia - threshold 10 false-positives them
  *   - Genuinely problematic schemes like rainbow have fold-over
  *     pairs well below 7
  */
@@ -199,9 +199,7 @@ function buildPairBatches(length: number, scaleType: ScaleType): PairBatch[] {
   // For 16 samples, minGap = 4 → covers distances from 25% to 100%.
   const minGap = Math.max(2, Math.floor(length / 4));
 
-  return [
-    {pairs: distantPairs(length, minGap), threshold: SEQUENTIAL_DISTANT_THRESHOLD},
-  ];
+  return [{pairs: distantPairs(length, minGap), threshold: SEQUENTIAL_DISTANT_THRESHOLD}];
 }
 
 // ─── Core logic ──────────────────────────────────────────────────
@@ -209,11 +207,7 @@ function buildPairBatches(length: number, scaleType: ScaleType): PairBatch[] {
 /**
  * Simulate one CVD type on a color array and find problematic pairs.
  */
-function testOneCvdType(
-  colors: string[],
-  scaleType: ScaleType,
-  cvdType: CvdType,
-): CvdTestResult {
+function testOneCvdType(colors: string[], scaleType: ScaleType, cvdType: CvdType): CvdTestResult {
   const simulator = CVD_SIMULATORS[cvdType];
 
   // Parse every color, simulate CVD, store the simulated result.
@@ -251,7 +245,7 @@ function testOneCvdType(
   }
 
   // Convert simulated colors to hex strings for the preview.
-  const simulatedHex = simulated.map((c) => (c ? formatHex(c) ?? '#000000' : '#000000'));
+  const simulatedHex = simulated.map((c) => (c ? (formatHex(c) ?? '#000000') : '#000000'));
 
   return {
     cvdType,
@@ -279,13 +273,10 @@ function round2(n: number): number {
  * @param colors    - Array of CSS color strings to evaluate.
  * @param scaleType - Determines the comparison strategy.
  */
-export function evaluateColorblindSafety(
-  colors: string[],
-  scaleType: ScaleType,
-): CvdTestResult[] {
-  return ALL_CVD_TYPES
-    .map((cvdType) => testOneCvdType(colors, scaleType, cvdType))
-    .filter((result) => result.problematicPairs.length > 0);
+export function evaluateColorblindSafety(colors: string[], scaleType: ScaleType): CvdTestResult[] {
+  return ALL_CVD_TYPES.map((cvdType) => testOneCvdType(colors, scaleType, cvdType)).filter(
+    (result) => result.problematicPairs.length > 0,
+  );
 }
 
 /**
@@ -307,10 +298,12 @@ export function simulateCvdColors(colors: string[], cvdType: CvdType): string[] 
   });
 }
 
-/** Debug helper — returns min ΔE for each CVD type WITHOUT filtering. */
+/** Debug helper - returns min ΔE for each CVD type WITHOUT filtering. */
 export function debugCvdDeltaE(colors: string[], scaleType: ScaleType): void {
   for (const cvdType of ALL_CVD_TYPES) {
     const result = testOneCvdType(colors, scaleType, cvdType);
-    console.log(`[CVD ΔE] ${cvdType}: minΔE=${result.minDeltaE}, pairs=${result.problematicPairs.length}, threshold=${scaleType === 'categorical' ? CATEGORICAL_THRESHOLD : SEQUENTIAL_DISTANT_THRESHOLD}`);
+    console.log(
+      `[CVD ΔE] ${cvdType}: minΔE=${result.minDeltaE}, pairs=${result.problematicPairs.length}, threshold=${scaleType === 'categorical' ? CATEGORICAL_THRESHOLD : SEQUENTIAL_DISTANT_THRESHOLD}`,
+    );
   }
 }

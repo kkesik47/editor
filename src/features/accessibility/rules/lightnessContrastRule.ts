@@ -14,7 +14,7 @@
  *
  * Diverging is treated separately because a correctly designed
  * diverging palette (e.g. blueorange) has a V-shaped lightness
- * profile by design — checking the whole sequence for monotonicity
+ * profile by design - checking the whole sequence for monotonicity
  * would always fail.
  *
  * Categorical scales are deliberately excluded: qualitative palettes
@@ -25,11 +25,11 @@
  * categorical data.
  *
  * Architecture:
- *   1. resolveScaleColors  — reused from the CVD rule
- *   2. analyzeLightness    — sequential analysis
- *   3. analyzeDivergingLightness — per-half diverging analysis
- *   4. toGrayscale         — convert colors to gray equivalents
- *   5. this file           — orchestrate and produce issues
+ *   1. resolveScaleColors  - reused from the CVD rule
+ *   2. analyzeLightness    - sequential analysis
+ *   3. analyzeDivergingLightness - per-half diverging analysis
+ *   4. toGrayscale         - convert colors to gray equivalents
+ *   5. this file           - orchestrate and produce issues
  */
 
 import type {AccessibilityIssue, AccessibilityRule} from '../types.js';
@@ -60,7 +60,7 @@ function buildSequentialRangeIssue(
     severity: 'info',
 
     message:
-      `The '${scale.channel}' scale has a narrow lightness range ` +
+      `The ${scale.channel} scale has a narrow lightness range ` +
       `(L* range = ${analysis.totalRange}, ` +
       `threshold = ${SEQUENTIAL_LIGHTNESS_RANGE_THRESHOLD}). ` +
       `In grayscale, this scale will appear as a nearly flat gray band, ` +
@@ -103,8 +103,8 @@ function buildMonotonicityIssue(
     severity: 'info',
 
     message:
-      `The '${scale.channel}' sequential scale${schemeNote} has ` +
-      `non-monotonic lightness — the brightness reverses direction ` +
+      `The sequential ${scale.channel} scale${schemeNote} has ` +
+      `non-monotonic lightness - the brightness reverses direction ` +
       `${reversalCount} ${reversalCount === 1 ? 'time' : 'times'}. ` +
       `A sequential scale should move from light (low values) to dark ` +
       `(high values), or vice versa, so that brightness consistently ` +
@@ -169,7 +169,7 @@ function buildDivergingRangeIssue(
     severity: 'info',
 
     message:
-      `The '${scale.channel}' diverging scale${schemeNote} has too ` +
+      `The diverging ${scale.channel} scale${schemeNote} has too ` +
       `little brightness change on the ${sides} ` +
       `${sides === 'both' ? 'halves' : 'half'} ` +
       `(lower half = ${analysis.leftRange} L*, ` +
@@ -224,7 +224,7 @@ function buildDivergingMonotonicityIssue(
     severity: 'info',
 
     message:
-      `The '${scale.channel}' diverging scale${schemeNote} has ` +
+      `The diverging ${scale.channel} scale${schemeNote} has ` +
       `irregular brightness on the ${sides} ` +
       `${sides === 'both' ? 'halves' : 'half'}. ` +
       `A diverging scale should grow steadily lighter (or darker) ` +
@@ -268,7 +268,7 @@ export const lightnessContrastRule: AccessibilityRule = {
     'in grayscale. Sequential scales are checked for total L* range ' +
     'and global monotonicity; diverging scales are checked per-half ' +
     'for range and monotonicity (their lightness is expected to form ' +
-    'a V around the midpoint). Categorical scales are not analysed — ' +
+    'a V around the midpoint). Categorical scales are not analysed - ' +
     'qualitative palettes trade lightness uniformity for hue diversity ' +
     'by design.',
 

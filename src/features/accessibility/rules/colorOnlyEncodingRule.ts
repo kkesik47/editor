@@ -51,14 +51,17 @@ const REDUNDANT_CHANNELS = [
   'shape',
   'strokeDash',
   'text',
-  'x', 'y',
+  'x',
+  'y',
   // NOTE: xOffset / yOffset are deliberately NOT here. They separate
   // marks spatially but render no labelled axis, so the only key to
-  // which category is which remains the colour legend — i.e. colour is
+  // which category is which remains the colour legend - i.e. colour is
   // still the sole *identifying* encoding (WCAG 1.4.1). By contrast
   // x / y / row / column / facet all render labelled ticks or headers,
   // which is why they DO count as redundant.
-  'row', 'column', 'facet',
+  'row',
+  'column',
+  'facet',
 ] as const;
 /** Mark types where `shape` encoding is meaningful. */
 const SHAPE_MARKS = ['point', 'circle', 'square'];
@@ -125,10 +128,7 @@ function isCategoricalType(channelDef: Record<string, any>): boolean {
  * Check whether any redundant (non-color) channel in the encoding
  * block maps the same field name.
  */
-function hasRedundantEncoding(
-  encoding: Record<string, any>,
-  fieldName: string,
-): boolean {
+function hasRedundantEncoding(encoding: Record<string, any>, fieldName: string): boolean {
   for (const channel of REDUNDANT_CHANNELS) {
     const channelDef = encoding[channel];
     if (!channelDef || typeof channelDef !== 'object') continue;
@@ -187,9 +187,9 @@ function buildSuggestion(markType: string | null, channel: string): string {
 /**
  * The channel-def-shaped object that actually carries field/type for
  * this colour encoding. Vega-Lite allows the categorical field and
- * type to live inside a `condition` block — the `color.condition`
+ * type to live inside a `condition` block - the `color.condition`
  * branch is exactly where things like the brush/click pattern put
- * them — while `color` itself only carries the fallback `value`.
+ * them - while `color` itself only carries the fallback `value`.
  * Without this resolution the rule misses every chart using that
  * pattern, because `channelDef.field` is undefined.
  *
@@ -205,8 +205,6 @@ function effectiveColorChannelDef(channelDef: Record<string, any>): Record<strin
   }
   return channelDef;
 }
-
-
 
 // ─── Spec walker ─────────────────────────────────────────────────
 
@@ -225,7 +223,7 @@ function checkNodeEncoding(
 
   const markType = resolveMarkType(node);
 
-  // Skip text marks — the text itself is a redundant encoding
+  // Skip text marks - the text itself is a redundant encoding
   if (markType === 'text') return;
 
   for (const channel of COLOR_CHANNELS) {
@@ -241,8 +239,7 @@ function checkNodeEncoding(
     // strokeDash, position…) OR from a SIBLING layer (e.g. a text
     // label layer added as a fix). Either one clears the issue.
     const covered =
-      hasRedundantEncoding(encoding, fieldName) ||
-      siblingLayerProvidesRedundancy(encoding, siblings, fieldName);
+      hasRedundantEncoding(encoding, fieldName) || siblingLayerProvidesRedundancy(encoding, siblings, fieldName);
 
     if (!covered) {
       results.push({
@@ -270,7 +267,7 @@ function walkSpec(
 
   const obj = node as Record<string, any>;
 
-  // This node's own encoding — siblings (if any) can satisfy redundancy.
+  // This node's own encoding - siblings (if any) can satisfy redundancy.
   checkNodeEncoding(obj, pointer, results, siblings);
 
   // Layer: each child sees the OTHER layers as redundancy context.
@@ -285,9 +282,7 @@ function walkSpec(
   // Concatenations & nested spec: separate views, no cross-unit redundancy.
   for (const key of ['hconcat', 'vconcat', 'concat'] as const) {
     if (Array.isArray(obj[key])) {
-      (obj[key] as unknown[]).forEach((child, i) =>
-        walkSpec(child, `${pointer}/${key}/${i}`, results),
-      );
+      (obj[key] as unknown[]).forEach((child, i) => walkSpec(child, `${pointer}/${key}/${i}`, results));
     }
   }
   if (obj.spec) {
@@ -298,10 +293,7 @@ function walkSpec(
 // ─── Issue builder ───────────────────────────────────────────────
 
 function buildIssue(match: ColorOnlyMatch): AccessibilityIssue {
-  const channelLabel =
-    match.channel === 'color' ? 'color'
-    : match.channel === 'fill' ? 'fill color'
-    : 'stroke color';
+  const channelLabel = match.channel === 'color' ? 'color' : match.channel === 'fill' ? 'fill color' : 'stroke color';
 
   return {
     ruleId: `vl-a11y-color-only:${match.channel}`,
@@ -336,7 +328,7 @@ function buildIssue(match: ColorOnlyMatch): AccessibilityIssue {
  * Only non-positional channels: a sibling text / shape / strokeDash
  * layer carrying the same field (and sitting at the same x/y) lets a
  * colour-blind reader tell categories apart. This is what recognises
- * the "add a text-label layer" fix — the category becomes readable
+ * the "add a text-label layer" fix - the category becomes readable
  * text in a sibling layer rather than a channel on the original mark.
  */
 const SIBLING_REDUNDANT_CHANNELS = ['text', 'shape', 'strokeDash'] as const;
@@ -357,10 +349,7 @@ function positionalField(encoding: Record<string, any>, channel: string): string
  * a different position would NOT count, which is the behaviour we want.
  */
 function sharesPosition(a: Record<string, any>, b: Record<string, any>): boolean {
-  return (
-    positionalField(a, 'x') === positionalField(b, 'x') &&
-    positionalField(a, 'y') === positionalField(b, 'y')
-  );
+  return positionalField(a, 'x') === positionalField(b, 'x') && positionalField(a, 'y') === positionalField(b, 'y');
 }
 
 /**
@@ -387,7 +376,6 @@ function siblingLayerProvidesRedundancy(
   }
   return false;
 }
-
 
 // ─── The rule ────────────────────────────────────────────────────
 

@@ -16,7 +16,7 @@
  *   match on prefix so all sub-category issues share the same
  *   recommendations.
  *
- * Special case — colorRiskRule:
+ * Special case - colorRiskRule:
  *   Same divergence as in `resolveIssueReferences.ts`: the rule's
  *   `id` field is 'vl-a11y-color-risk-engine', but its issues use
  *   the prefix 'vl-a11y-color-risk-rules' (inherited from the
@@ -37,7 +37,7 @@ import {perceptualUniformityRecommendations} from './perceptualUniformityRecs.js
 const RECOMMENDATION_REGISTRY: Record<string, Recommendation[]> = {
   'vl-a11y-colorblind-safety': colorblindSafetyRecommendations,
   // Both the rule.id and the issue-ID prefix are mapped to the same
-  // recommendations array — see the special-case note above.
+  // recommendations array - see the special-case note above.
   'vl-a11y-color-risk-engine': colorRiskRecommendations,
   'vl-a11y-color-risk-rules': colorRiskRecommendations,
   'vl-a11y-color-only': colorOnlyEncodingRecommendations,
@@ -71,11 +71,6 @@ export function getRecommendationsForRule(ruleId: string): Recommendation[] {
  * spec. This is the main entry point the accessibility pane calls
  * when rendering the recommendations section of an issue card.
  */
-export function getApplicableRecommendations(
-  issue: AccessibilityIssue,
-  spec: VegaLiteSpec,
-): Recommendation[] {
-  return getRecommendationsForRule(issue.ruleId).filter((rec) =>
-    rec.applicableWhen(issue, spec),
-  );
+export function getApplicableRecommendations(issue: AccessibilityIssue, spec: VegaLiteSpec): Recommendation[] {
+  return getRecommendationsForRule(issue.ruleId).filter((rec) => rec.applicableWhen(issue, spec));
 }

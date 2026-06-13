@@ -25,7 +25,7 @@
  *
  * Categorical scales are not handled here: the lightness rule does
  * not apply to them (qualitative palettes trade lightness uniformity
- * for hue diversity by design — Brewer 2003; Wong 2011).
+ * for hue diversity by design - Brewer 2003; Wong 2011).
  */
 
 import {scheme as vegaScheme} from 'vega-scale';
@@ -40,17 +40,13 @@ import {SCHEME_CATALOG, type SchemeType, type SchemeEntry} from './schemeCatalog
 // ─── Scheme resolution ──────────────────────────────────────────
 //
 // We resolve schemes the same way `resolveScaleColors` does, but
-// locally — the helper there isn't exported and we don't want to
+// locally - the helper there isn't exported and we don't want to
 // couple the recommendations module to its private internals.
 
 /** Sample count for continuous (sequential / diverging) schemes. */
 const CONTINUOUS_SAMPLE_COUNT = 16;
 
-function resolveSchemeColors(
-  schemeName: string,
-  scaleType: SchemeType,
-  categoryCount?: number,
-): string[] | null {
+function resolveSchemeColors(schemeName: string, scaleType: SchemeType, categoryCount?: number): string[] | null {
   let value: unknown;
   try {
     value = vegaScheme(schemeName);
@@ -74,9 +70,7 @@ function resolveSchemeColors(
   // will actually render.
   if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
     const colors = value as string[];
-    return categoryCount && categoryCount > 0
-      ? colors.slice(0, categoryCount)
-      : colors;
+    return categoryCount && categoryCount > 0 ? colors.slice(0, categoryCount) : colors;
   }
 
   return null;
@@ -86,10 +80,7 @@ function resolveSchemeColors(
 
 function isSequentialSafe(colors: string[]): boolean {
   const analysis = analyzeLightness(colors);
-  return (
-    analysis.totalRange >= SEQUENTIAL_LIGHTNESS_RANGE_THRESHOLD &&
-    analysis.isMonotonic
-  );
+  return analysis.totalRange >= SEQUENTIAL_LIGHTNESS_RANGE_THRESHOLD && analysis.isMonotonic;
 }
 
 function isDivergingSafe(colors: string[]): boolean {
@@ -108,13 +99,13 @@ function isDivergingSafe(colors: string[]): boolean {
 /**
  * Find catalogue schemes whose lightness profile is good enough that
  * `lightnessContrastRule` would not flag them. Sequential and
- * diverging shapes only — the lightness rule does not apply to
+ * diverging shapes only - the lightness rule does not apply to
  * categorical scales.
  *
  * The original scheme (if any) is excluded so we never offer the
  * same one back.
  *
- * Returns an empty array when no candidate passes — at which point
+ * Returns an empty array when no candidate passes - at which point
  * the caller's `applicableWhen` should drop the recommendation
  * entirely.
  */
@@ -124,12 +115,9 @@ export function findLightnessSafeSchemes(args: {
 }): SchemeEntry[] {
   const exclude = args.excludeSchemeName?.toLowerCase().replace(/-\d+$/, '');
 
-  const candidates = SCHEME_CATALOG.filter(
-    (s) => s.type === args.scaleType && s.name !== exclude,
-  );
+  const candidates = SCHEME_CATALOG.filter((s) => s.type === args.scaleType && s.name !== exclude);
 
-  const predicate =
-    args.scaleType === 'sequential' ? isSequentialSafe : isDivergingSafe;
+  const predicate = args.scaleType === 'sequential' ? isSequentialSafe : isDivergingSafe;
 
   const safe: SchemeEntry[] = [];
   for (const candidate of candidates) {

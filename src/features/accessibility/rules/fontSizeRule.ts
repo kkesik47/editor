@@ -15,13 +15,13 @@
  *
  * Severity:
  *     Always 'info'. Font size is a readability concern, so it is surfaced as a suggestion
- *     rather than a warning — whether the value was set inline/in config
+ *     rather than a warning - whether the value was set inline/in config
  *     or inherited from a Vega-Lite default.
  *
  * Editor visibility:
- *   - inline / config issues use 'underline' — the offending number is
+ *   - inline / config issues use 'underline' - the offending number is
  *     in the source, so we underline it directly.
- *   - default-source issues use 'underline-key' — the criticised value
+ *   - default-source issues use 'underline-key' - the criticised value
  *     is NOT in the source (nothing is written), so the pointer is an
  *     anchor for the fix rather than the location of a value. We
  *     underline the property key (e.g. `"y"`, `"axis"`, `"title"`)
@@ -29,15 +29,12 @@
  *     without falsely marking unrelated sibling properties.
  *
  * Architecture:
- *   1. fontSizeAnalysis.ts — extract effective sizes and compare
- *   2. this file           — convert results into AccessibilityIssue objects
+ *   1. fontSizeAnalysis.ts - extract effective sizes and compare
+ *   2. this file           - convert results into AccessibilityIssue objects
  */
 
 import type {AccessibilityIssue, AccessibilityRule} from '../types.js';
-import {
-  analyzeFontSizes,
-  type FontSizeEntry,
-} from './fontSizeAnalysis.js';
+import {analyzeFontSizes, type FontSizeEntry} from './fontSizeAnalysis.js';
 import {LEGGE_BIGELOW_2011, RELLO_2016} from '../references.js';
 
 // ─── Issue builder ───────────────────────────────────────────────
@@ -69,20 +66,16 @@ function configSectionName(configKey: string): string {
  *
  * Default-source issues use 'underline-key' so the editor marks the
  * property key (e.g. `"y"`, `"axis"`, `"title"`) rather than the
- * whole value — see the file header for the rationale.
+ * whole value - see the file header for the rationale.
  */
 function buildIssue(entry: FontSizeEntry): AccessibilityIssue {
   const isDefault = entry.source === 'default';
-  // every font issue is a suggestion — regardless of whether the too-small value
+  // every font issue is a suggestion - regardless of whether the too-small value
   // was authored or inherited from a default
   const severity = 'info';
 
   const sourceLabel =
-    entry.source === 'default'
-      ? 'Vega-Lite default'
-      : entry.source === 'config'
-        ? 'config block'
-        : 'inline property';
+    entry.source === 'default' ? 'Vega-Lite default' : entry.source === 'config' ? 'config block' : 'inline property';
 
   const property = jsonPropertyName(entry.configKey);
   const section = configSectionName(entry.configKey);
@@ -96,16 +89,15 @@ function buildIssue(entry: FontSizeEntry): AccessibilityIssue {
       `(${sourceLabel}), which is below the recommended minimum ` +
       `of ${entry.threshold} px for ${entry.role === 'title' ? 'titles' : 'labels'}.`,
 
-    suggestion:
-      isDefault
-        ? `Add "${property}": ${entry.threshold} to your ${section} configuration.`
-        : `Increase "${property}" to at least ${entry.threshold}.`,
+    suggestion: isDefault
+      ? `Add "${property}": ${entry.threshold} to your ${section} configuration.`
+      : `Increase "${property}" to at least ${entry.threshold}.`,
 
     jsonPointer: entry.jsonPointer,
 
     // Inline/config issues underline the offending number. Default
     // issues have no written value to point at, so we underline just
-    // the property key instead — see the file header.
+    // the property key instead - see the file header.
     editorVisibility: isDefault ? 'underline-key' : 'underline',
 
     evidence: {

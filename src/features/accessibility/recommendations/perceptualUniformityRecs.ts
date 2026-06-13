@@ -4,7 +4,7 @@
  * Recommendations for issues from `perceptualUniformityRule`.
  *
  * The rule fires when an ordered (sequential / diverging) colour scale
- * has uneven perceptual steps — equal data intervals producing unequal
+ * has uneven perceptual steps - equal data intervals producing unequal
  * visible colour changes (the classic rainbow problem). The
  * machine-applicable fix is to swap the scale for a perceptually
  * uniform scheme, via `setScheme` (which drops any explicit `range`).
@@ -35,7 +35,7 @@
  *   - scale shape matches,
  *   - not the scheme already in use,
  *   - and ACTUALLY passes the uniformity check via
- *     `findUniformSchemes` — so we never recommend a "fix" that
+ *     `findUniformSchemes` - so we never recommend a "fix" that
  *     would just re-trigger the same rule.
  *
  * ─── On the dropped rainbow → turbo recommendation ──────────────
@@ -44,7 +44,7 @@
  * but fix uniformity" option for rainbow / sinebow originals.
  * Empirical testing showed turbo's CV at the rule's sampling density
  * is not meaningfully better than the rainbow input in our pipeline,
- * so recommending it would be dishonest — the rec was removed rather
+ * so recommending it would be dishonest - the rec was removed rather
  * than papered over with a threshold bypass. Detecting rainbow-likeness
  * from custom `range` arrays is also non-trivial, so a future
  * "preserve hue feel" rec for arbitrary input would need separate work.
@@ -62,7 +62,7 @@ import {findUniformSchemes, type OrderedScaleType} from './perceptualUniformityA
 // ─── Evidence reader ─────────────────────────────────────────────
 
 interface UniformityEvidence {
-  /** Only 'sequential' / 'diverging' reach here — the rule skips categorical. */
+  /** Only 'sequential' / 'diverging' reach here - the rule skips categorical. */
   scaleType: OrderedScaleType;
   /** Original scheme name, or null when the scale uses an explicit range. */
   schemeName: string | null;
@@ -102,29 +102,24 @@ const SEQUENTIAL_CANDIDATES: Candidate[] = [
     type: 'sequential',
     description:
       'Perceptually uniform: equal data steps produce equal visual ' +
-      'changes. Strong neutral default — grayscale-readable and ' +
+      'changes. Strong neutral default - grayscale-readable and ' +
       'colourblind-safe.',
   },
   {
     name: 'cividis',
     type: 'sequential',
     description:
-      'Perceptually uniform, designed so colourblind and ' +
-      'non-colourblind viewers see nearly the same scale.',
+      'Perceptually uniform, designed so colourblind and ' + 'non-colourblind viewers see nearly the same scale.',
   },
   {
     name: 'magma',
     type: 'sequential',
-    description:
-      'Perceptually uniform, dark-purple → orange → yellow. Best for ' +
-      'keeping a warm look.',
+    description: 'Perceptually uniform, dark-purple → orange → yellow. Best for ' + 'keeping a warm look.',
   },
   {
     name: 'greys',
     type: 'sequential',
-    description:
-      'Neutral grayscale. The most robust option for print and for ' +
-      'any colour vision deficiency.',
+    description: 'Neutral grayscale. The most robust option for print and for ' + 'any colour vision deficiency.',
   },
 ];
 
@@ -139,23 +134,17 @@ const DIVERGING_CANDIDATES: Candidate[] = [
   {
     name: 'redblue',
     type: 'diverging',
-    description:
-      'Classic red–blue diverging palette with reasonably even steps ' +
-      'on each side of the midpoint.',
+    description: 'Classic red–blue diverging palette with reasonably even steps ' + 'on each side of the midpoint.',
   },
   {
     name: 'purpleorange',
     type: 'diverging',
-    description:
-      'Purple–orange axis with even steps per half and good ' +
-      'colourblind safety.',
+    description: 'Purple–orange axis with even steps per half and good ' + 'colourblind safety.',
   },
   {
     name: 'brownbluegreen',
     type: 'diverging',
-    description:
-      'Brown ↔ blue-green diverging palette, even per half and ' +
-      'colourblind-friendly.',
+    description: 'Brown ↔ blue-green diverging palette, even per half and ' + 'colourblind-friendly.',
   },
   {
     name: 'purplegreen',
@@ -198,7 +187,7 @@ function buildSchemeSwapRec(candidate: Candidate): Recommendation {
 
     apply(issue, spec) {
       // Pointer addresses scale.scheme or scale.range; its parent is
-      // the scale object — same shape as the other scale-swap recs.
+      // the scale object - same shape as the other scale-swap recs.
       return setScheme(spec, parentPointer(issue.jsonPointer), candidate.name);
     },
   };

@@ -11,7 +11,7 @@
  *                     "(Brettel et al., 1997; Sharma et al., 2005)"
  *   - fullCitation  : full APA-style citation for the references panel
  *   - url           : DOI URL when available, otherwise the canonical source URL
- *   - type          : 'paper' | 'standard' | 'book' | 'web' — used for filtering and rendering
+ *   - type          : 'paper' | 'standard' | 'book' | 'web' - used for filtering and rendering
  *
  * Usage in a rule:
  *
@@ -25,7 +25,7 @@
  *     };
  *
  * The thesis bibliography is managed independently in Zotero. The same
- * papers appear in both, but there is no mechanical key-matching — this
+ * papers appear in both, but there is no mechanical key-matching - this
  * file is the source of truth for code-side citations, the .bib is the
  * source of truth for the thesis.
  */
@@ -35,7 +35,7 @@
 export type ReferenceType = 'paper' | 'standard' | 'book' | 'web';
 
 export interface Reference {
-  /** Stable URL-safe identifier — used in deep links and the catalog map. */
+  /** Stable URL-safe identifier - used in deep links and the catalog map. */
   id: string;
   /**
    * APA in-text citation form WITHOUT surrounding parentheses, e.g.
@@ -48,9 +48,9 @@ export interface Reference {
   shortCitation: string;
   /** Full APA-style citation for hover tooltips and references panels. */
   fullCitation: string;
-  /** DOI URL or canonical source URL — what the user clicks to read it. */
+  /** DOI URL or canonical source URL - what the user clicks to read it. */
   url: string;
-  /** Source type — useful for filtering and choosing a rendering style. */
+  /** Source type - useful for filtering and choosing a rendering style. */
   type: ReferenceType;
 }
 
@@ -60,7 +60,7 @@ export const WCAG_USE_OF_COLOR: Reference = {
   id: 'wcag-1-4-1',
   shortCitation: 'WCAG 2.2 SC 1.4.1',
   fullCitation:
-    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 — ' +
+    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 - ' +
     'Success Criterion 1.4.1: Use of Color (Level A).',
   url: 'https://www.w3.org/TR/WCAG22/#use-of-color',
   type: 'standard',
@@ -70,7 +70,7 @@ export const WCAG_CONTRAST_MIN: Reference = {
   id: 'wcag-1-4-3',
   shortCitation: 'WCAG 2.2 SC 1.4.3',
   fullCitation:
-    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 — ' +
+    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 - ' +
     'Success Criterion 1.4.3: Contrast (Minimum) (Level AA).',
   url: 'https://www.w3.org/TR/WCAG22/#contrast-minimum',
   type: 'standard',
@@ -80,7 +80,7 @@ export const WCAG_CONTRAST_ENHANCED: Reference = {
   id: 'wcag-1-4-6',
   shortCitation: 'WCAG 2.2 SC 1.4.6',
   fullCitation:
-    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 — ' +
+    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 - ' +
     'Success Criterion 1.4.6: Contrast (Enhanced) (Level AAA).',
   url: 'https://www.w3.org/TR/WCAG22/#contrast-enhanced',
   type: 'standard',
@@ -90,7 +90,7 @@ export const WCAG_NON_TEXT_CONTRAST: Reference = {
   id: 'wcag-1-4-11',
   shortCitation: 'WCAG 2.2 SC 1.4.11',
   fullCitation:
-    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 — ' +
+    'World Wide Web Consortium (W3C). (2023). Web Content Accessibility Guidelines (WCAG) 2.2 - ' +
     'Success Criterion 1.4.11: Non-Text Contrast (Level AA).',
   url: 'https://www.w3.org/TR/WCAG22/#non-text-contrast',
   type: 'standard',
@@ -232,7 +232,7 @@ export const BERGMAN_1995: Reference = {
   fullCitation:
     'Bergman, L. D., Rogowitz, B. E., & Treinish, L. A. (1995). ' +
     'A rule-based tool for assisting colormap selection. ' +
-    'In Proceedings of Visualization \'95 (pp. 118–125). IEEE Computer Society Press.',
+    "In Proceedings of Visualization '95 (pp. 118–125). IEEE Computer Society Press.",
   url: 'https://doi.org/10.1109/VISUAL.1995.480803',
   type: 'paper',
 };

@@ -9,7 +9,7 @@
  *
  * Uses CIELAB L* (perceptual lightness) extracted via the `culori`
  * library. L* ranges from 0 (black) to 100 (white) and is designed
- * to be perceptually uniform — equal numeric differences correspond
+ * to be perceptually uniform - equal numeric differences correspond
  * to roughly equal perceived differences.
  *
  * Three checks are performed, depending on the scale shape:
@@ -19,7 +19,7 @@
  *        Below this the scale looks like a flat gray band.
  *     2. L* must progress monotonically (no significant reversals).
  *        Non-monotonic lightness means the perceptual ordering
- *        doesn't match the data ordering — users can't use
+ *        doesn't match the data ordering - users can't use
  *        brightness to read values reliably.
  *
  *   Diverging scales → analysed via `analyzeDivergingLightness`:
@@ -180,14 +180,12 @@ export function toGrayscale(colors: string[]): string[] {
  * doesn't track data values, making the scale misleading.
  *
  * Small fluctuations below MONOTONICITY_REVERSAL_THRESHOLD are
- * ignored — these are normal at 16 samples and don't represent
+ * ignored - these are normal at 16 samples and don't represent
  * real perceptual direction changes.
  *
  * @returns An object with isMonotonic flag and any reversal points.
  */
-function checkMonotonicity(
-  lightnessValues: number[],
-): {isMonotonic: boolean; reversals: LightnessReversal[]} {
+function checkMonotonicity(lightnessValues: number[]): {isMonotonic: boolean; reversals: LightnessReversal[]} {
   if (lightnessValues.length < 3) {
     return {isMonotonic: true, reversals: []};
   }
@@ -208,7 +206,7 @@ function checkMonotonicity(
 
     if (expectedDirection === 'rising') {
       if (current >= lastExtreme) {
-        // Still rising — update the extreme
+        // Still rising - update the extreme
         lastExtreme = current;
       } else if (lastExtreme - current >= MONOTONICITY_REVERSAL_THRESHOLD) {
         // Significant drop against the rising trend
@@ -221,7 +219,7 @@ function checkMonotonicity(
       }
     } else {
       if (current <= lastExtreme) {
-        // Still falling — update the extreme
+        // Still falling - update the extreme
         lastExtreme = current;
       } else if (current - lastExtreme >= MONOTONICITY_REVERSAL_THRESHOLD) {
         // Significant rise against the falling trend
@@ -300,9 +298,7 @@ export function analyzeLightness(colors: string[]): LightnessAnalysisResult {
  * Both halves include the midpoint sample, so a kink right at the
  * centre is caught in both sub-sequences.
  */
-export function analyzeDivergingLightness(
-  colors: string[],
-): DivergingLightnessAnalysisResult {
+export function analyzeDivergingLightness(colors: string[]): DivergingLightnessAnalysisResult {
   const lightnessValues: number[] = [];
 
   for (const color of colors) {
@@ -317,13 +313,9 @@ export function analyzeDivergingLightness(
   const left = lightnessValues.slice(0, midIndex + 1);
   const right = lightnessValues.slice(midIndex);
 
-  const leftRange = left.length >= 2
-    ? round1(Math.abs(left[left.length - 1] - left[0]))
-    : 0;
+  const leftRange = left.length >= 2 ? round1(Math.abs(left[left.length - 1] - left[0])) : 0;
 
-  const rightRange = right.length >= 2
-    ? round1(Math.abs(right[right.length - 1] - right[0]))
-    : 0;
+  const rightRange = right.length >= 2 ? round1(Math.abs(right[right.length - 1] - right[0])) : 0;
 
   const leftCheck = checkMonotonicity(left);
   const rightCheck = checkMonotonicity(right);

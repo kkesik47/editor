@@ -1,11 +1,11 @@
 /**
- * AccessibilityHeatmap (overlay) — heatmap blobs + clustered issues
+ * AccessibilityHeatmap (overlay) - heatmap blobs + clustered issues
  *
  * A transparent layer over the rendered chart that paints a soft,
  * heatmap-style blob wherever an accessibility issue manifests. Issues
  * that land on the same spot are merged into one cluster, drawn as a
  * single blob whose intensity grows with how many issues it represents
- * and tagged with a count badge — the literal "hot spot" reading.
+ * and tagged with a count badge - the literal "hot spot" reading.
  *
  * Two coordinate spaces are in play, and each visual lives in the one
  * that suits it:
@@ -15,7 +15,7 @@
  *     coordinates onto the displayed chart exactly the way Vega does,
  *     so resolver boxes drop in with no per-box maths. The non-uniform
  *     scaling stretches blobs a little, which only makes them look more
- *     organic — fine for soft shapes.
+ *     organic - fine for soft shapes.
  *
  *   • Count badges live as HTML elements positioned in PIXEL space over
  *     the same container. A circle + number drawn inside the stretched
@@ -23,7 +23,7 @@
  *     tiny scene→pixel projection (sceneToPixel) places them.
  *
  * The overlay is renderer-agnostic (reads view.scenegraph(), not the
- * DOM) and a pure consumer of issues — it never produces them, so the
+ * DOM) and a pure consumer of issues - it never produces them, so the
  * settings toggle can hide it without touching evaluation.
  */
 
@@ -259,13 +259,15 @@ export default function AccessibilityHeatmap() {
               key={ci}
               onMouseEnter={() => setHover([cluster.keys[0]])}
               onMouseLeave={() => setHover([])}
-              onClick={() => setState((s) => ({
-                ...s,
-                navItem: NAVBAR.Accessibility,
-                logs: false,
-                debugPane: true,
-                focusedIssueKey: cluster.keys[0],
-              }))}
+              onClick={() =>
+                setState((s) => ({
+                  ...s,
+                  navItem: NAVBAR.Accessibility,
+                  logs: false,
+                  debugPane: true,
+                  focusedIssueKey: cluster.keys[0],
+                }))
+              }
             >
               {blobs.map((b, bi) => {
                 const cx = b.x + b.width / 2;
@@ -276,7 +278,10 @@ export default function AccessibilityHeatmap() {
                   <ellipse
                     key={bi}
                     className={`a11y-blob a11y-blob-${cluster.severity}`}
-                    cx={cx} cy={cy} rx={rx} ry={ry}
+                    cx={cx}
+                    cy={cy}
+                    rx={rx}
+                    ry={ry}
                     fill={`url(#a11y-blob-${cluster.severity})`}
                     opacity={blobOpacity(cluster.count)}
                   />
@@ -287,7 +292,7 @@ export default function AccessibilityHeatmap() {
         })}
       </svg>
 
-      {/* Count badges — crisp HTML in pixel space, one per multi-issue
+      {/* Count badges - crisp HTML in pixel space, one per multi-issue
           cluster. Non-interactive so the blob beneath still takes hover. */}
       {clusters.map((cluster, i) => {
         if (cluster.count < 2) return null;
@@ -296,11 +301,7 @@ export default function AccessibilityHeatmap() {
         const anchor = largestMemberBox(cluster.memberBoxes);
         const corner = sceneToPixel(anchor.x + anchor.width, anchor.y);
         return (
-          <span
-            key={i}
-            className={`a11y-badge a11y-badge-${cluster.severity}`}
-            style={{left: corner.x, top: corner.y}}
-          >
+          <span key={i} className={`a11y-badge a11y-badge-${cluster.severity}`} style={{left: corner.x, top: corner.y}}>
             {cluster.count}
           </span>
         );

@@ -3,7 +3,7 @@
  *
  * Shared logic for locating TEXT elements on the rendered chart.
  *
- * Two rules point at the same set of text elements — fontSizeRule
+ * Two rules point at the same set of text elements - fontSizeRule
  * (text too small) and contrastRule's text branch (text too low
  * contrast). Both need to answer "where is the chart title / these
  * axis labels / that legend title on the chart?". That placement logic
@@ -131,17 +131,14 @@ function identifyAxes(root: SceneItem): Record<Channel, AxisRegion> {
  * Channel identification mirrors identifyAxes: a horizontal spread is
  * x, a vertical column is y.
  */
-function collectAxisLabelLeaves(root: SceneItem,
+function collectAxisLabelLeaves(
+  root: SceneItem,
   channel: Channel,
   inScope: (item: SceneItem) => boolean = () => true,
-  ): BoundingBox[] {
+): BoundingBox[] {
   const out: BoundingBox[] = [];
 
-  const recordLeaves = (
-    item: SceneItem,
-    offsetX: number,
-    offsetY: number,
-  ): void => {
+  const recordLeaves = (item: SceneItem, offsetX: number, offsetY: number): void => {
     const isLeaf = !item.items || item.items.length === 0;
     if (item.bounds && isLeaf) {
       const b = item.bounds;
@@ -159,8 +156,7 @@ function collectAxisLabelLeaves(root: SceneItem,
 
   const visit = (item: SceneItem, offsetX: number, offsetY: number): void => {
     if (item.role === 'axis-label' && item.bounds) {
-      const groupChannel: Channel =
-        item.bounds.x2 - item.bounds.x1 >= item.bounds.y2 - item.bounds.y1 ? 'x' : 'y';
+      const groupChannel: Channel = item.bounds.x2 - item.bounds.x1 >= item.bounds.y2 - item.bounds.y1 ? 'x' : 'y';
       if (groupChannel === channel && inScope(item)) {
         const childX = offsetX + (typeof item.x === 'number' ? item.x : 0);
         const childY = offsetY + (typeof item.y === 'number' ? item.y : 0);
@@ -240,7 +236,7 @@ export function locateTextElement(
     if (!groupMap || !allowedGroups) return true;
     const g = groupMap.get(item);
     // Items unmapped by the structural map are root-level globals
-    // (chart title etc.) — let them through; the resolver's choice of
+    // (chart title etc.) - let them through; the resolver's choice of
     // allowedGroups already restricts what's emitted at the spec side.
     return g == null || allowedGroups.has(g);
   };
@@ -257,22 +253,19 @@ export function locateTextElement(
 
     case 'axis-label':
       if (channel) return collectAxisLabelLeaves(root, channel, inScope);
-      return [
-        ...collectAxisLabelLeaves(root, 'x', inScope),
-        ...collectAxisLabelLeaves(root, 'y', inScope),
-      ];
+      return [...collectAxisLabelLeaves(root, 'x', inScope), ...collectAxisLabelLeaves(root, 'y', inScope)];
 
     case 'axis-title':
       return collectAxisTitles(root, channel, inScope);
   }
 }
 
-  // ─── Text-mark placement ──────────────────────────
+// ─── Text-mark placement ──────────────────────────
 
 /**
  * Locate the text glyphs belonging to one or more `mark: text` groups.
  *
- * Text marks scope by mark-group index — Vega-Lite renders text-mark
+ * Text marks scope by mark-group index - Vega-Lite renders text-mark
  * units in spec DFS order, so the Nth `role: 'mark'` group with
  * marktype 'text' is the unit at that DFS position. Pass the Set of
  * allowed indices to restrict to specific units, or `null` to cover
@@ -286,25 +279,16 @@ export function locateTextElement(
  * Use `markGroupIndicesForIssue` from `viewScope.ts` to derive the
  * Set from an issue's pointer.
  */
-export function locateTextMarksInGroups(
-  root: SceneItem,
-  allowedGroups: Set<number> | null,
-): BoundingBox[] {
+export function locateTextMarksInGroups(root: SceneItem, allowedGroups: Set<number> | null): BoundingBox[] {
   const out: BoundingBox[] = [];
   let groupIndex = 0;
 
-  const visit = (
-    item: SceneItem,
-    offsetX: number,
-    offsetY: number,
-    insideTargetGroup: boolean,
-  ): void => {
+  const visit = (item: SceneItem, offsetX: number, offsetY: number, insideTargetGroup: boolean): void => {
     let nextInside = insideTargetGroup;
 
     if (item.role === 'mark') {
       const isText = item.marktype === 'text';
-      const isTargetGroup =
-        allowedGroups === null || allowedGroups.has(groupIndex);
+      const isTargetGroup = allowedGroups === null || allowedGroups.has(groupIndex);
       groupIndex++;
 
       // Skip the entire mark group if it isn't in scope or isn't a

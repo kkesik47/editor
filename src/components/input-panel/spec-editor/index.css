@@ -17,12 +17,12 @@
 
 /* ── Accessibility decorations: warnings (Level A / AA) ────────── */
 
-/* Warning underline — orange, primary. The compound selector makes the
+/* Warning underline - orange, primary. The compound selector makes the
    warning WIN when a suggestion underline covers the same characters:
    Monaco puts both class names on one span, and a span can only show a
    single wavy underline, so the higher-specificity rule decides the
    colour. Orange shows wherever a warning is present (alone or over a
-   suggestion); blue only where there's no warning — so fixing a warning
+   suggestion); blue only where there's no warning - so fixing a warning
    lets the blue reappear there. */
 .a11yInlineDecoration,
 .a11ySuggestionInlineDecoration.a11yInlineDecoration {
@@ -41,7 +41,7 @@
  * with the yellow wavy underline from A/AA rules. When both rules
  * target overlapping ranges (e.g. fontSizeRule underlines the axis
  * object, contrast AAA underlines a color value inside it), CSS
- * text-decoration can only show one — border-bottom avoids that.
+ * text-decoration can only show one - border-bottom avoids that.
  */
 
 .a11ySuggestionInlineDecoration {
@@ -53,7 +53,7 @@
 }
 
 .a11ySuggestionRangeDecoration {
-  background-color: rgba(107, 138, 173, 0.10);
+  background-color: rgba(107, 138, 173, 0.1);
 }
 
 /* Hover highlight: when a heatmap region is hovered on the chart, the
@@ -69,7 +69,7 @@
   border-radius: 2px;
 }
 
-/* Suggestion hover — matches the blue blob/underline colour */
+/* Suggestion hover - matches the blue blob/underline colour */
 .a11yHoverLineHighlightInfo {
   background-color: rgba(28, 138, 228, 0.12);
 }

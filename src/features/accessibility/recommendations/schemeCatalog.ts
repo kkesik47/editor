@@ -21,12 +21,12 @@
  * However, recent work argues they retain communicative value in
  * specific contexts (high dynamic range, finely-resolved features):
  *
- *   - "Rainbow Colormaps Are Not All Bad" — the case that blanket
+ *   - "Rainbow Colormaps Are Not All Bad" - the case that blanket
  *     rejection of rainbow scales is too strong.
  *
  * We resolve this tension by offering plural recommendations rather
  * than mandating viridis. When the author's original scale was
- * rainbow-like, we suggest TURBO — a perceptually improved rainbow
+ * rainbow-like, we suggest TURBO - a perceptually improved rainbow
  * (Mikhailov, 2019) that preserves the high dynamic range while
  * being substantially safer under CVD. Authors who specifically
  * chose a rainbow keep what they wanted; authors who just defaulted
@@ -37,10 +37,10 @@ export type SchemeType = 'categorical' | 'sequential' | 'diverging';
 
 export type HueFamily =
   | 'rainbow-like' // turbo, rainbow, sinebow, spectral
-  | 'cool'         // blues, greens, viridis
-  | 'warm'         // reds, oranges, magma, inferno, plasma
-  | 'neutral'      // greys, cividis
-  | 'multi';       // categorical palettes with no single hue family
+  | 'cool' // blues, greens, viridis
+  | 'warm' // reds, oranges, magma, inferno, plasma
+  | 'neutral' // greys, cividis
+  | 'multi'; // categorical palettes with no single hue family
 
 export interface SchemeEntry {
   /** Vega-Lite scheme name, lowercase. */
@@ -167,17 +167,41 @@ export const SCHEME_CATALOG: SchemeEntry[] = [
   },
 
   // ─── Sequential single-hue (hue-preserving) ───────────────
-  {name: 'blues',   type: 'sequential', hueFamily: 'cool',    cvdSafe: true,  notes: 'Single blue hue, light→dark. Keeps a blue identity; safe in grayscale.'},
-  {name: 'reds',    type: 'sequential', hueFamily: 'warm',    cvdSafe: true,  notes: 'Single red hue, light→dark.'},
+  {
+    name: 'blues',
+    type: 'sequential',
+    hueFamily: 'cool',
+    cvdSafe: true,
+    notes: 'Single blue hue, light→dark. Keeps a blue identity; safe in grayscale.',
+  },
+  {name: 'reds', type: 'sequential', hueFamily: 'warm', cvdSafe: true, notes: 'Single red hue, light→dark.'},
 
   // ─── Sequential multi-hue (ColorBrewer) ───────────────────
-  {name: 'bluegreen',       type: 'sequential', hueFamily: 'cool', cvdSafe: true, notes: 'Blue→green progression, cool feel.'},
+  {
+    name: 'bluegreen',
+    type: 'sequential',
+    hueFamily: 'cool',
+    cvdSafe: true,
+    notes: 'Blue→green progression, cool feel.',
+  },
   {name: 'yelloworangered', type: 'sequential', hueFamily: 'warm', cvdSafe: true, notes: 'Warm yellow→orange→red.'},
 
   // ─── Diverging (ColorBrewer) ──────────────────────────────
-  {name: 'purplegreen',     type: 'diverging', hueFamily: 'multi', cvdSafe: true,  notes: 'Purple↔green diverging.'},
-  {name: 'pinkyellowgreen', type: 'diverging', hueFamily: 'multi', cvdSafe: false, notes: 'Pink↔green; the pink–green axis is weak under deuteranopia.'},
-  {name: 'redyellowblue',   type: 'diverging', hueFamily: 'multi', cvdSafe: true,  notes: 'Red↔blue through a light yellow midpoint.'},
+  {name: 'purplegreen', type: 'diverging', hueFamily: 'multi', cvdSafe: true, notes: 'Purple↔green diverging.'},
+  {
+    name: 'pinkyellowgreen',
+    type: 'diverging',
+    hueFamily: 'multi',
+    cvdSafe: false,
+    notes: 'Pink↔green; the pink–green axis is weak under deuteranopia.',
+  },
+  {
+    name: 'redyellowblue',
+    type: 'diverging',
+    hueFamily: 'multi',
+    cvdSafe: true,
+    notes: 'Red↔blue through a light yellow midpoint.',
+  },
 ];
 
 const DEFAULTS_BY_TYPE: Record<SchemeType, string> = {
@@ -209,15 +233,10 @@ export function findScheme(name: string): SchemeEntry | null {
  * @param originalName  Name of the author's current scheme, if known.
  * @param scaleType     Target scale type for the replacement.
  */
-export function pickReplacementScheme(
-  originalName: string | null,
-  scaleType: SchemeType,
-): SchemeEntry {
+export function pickReplacementScheme(originalName: string | null, scaleType: SchemeType): SchemeEntry {
   const original = originalName ? findScheme(originalName) : null;
 
-  const candidates = SCHEME_CATALOG.filter(
-    (s) => s.type === scaleType && s.cvdSafe,
-  );
+  const candidates = SCHEME_CATALOG.filter((s) => s.type === scaleType && s.cvdSafe);
 
   if (candidates.length === 0) {
     throw new Error(`No CVD-safe schemes registered for type "${scaleType}"`);

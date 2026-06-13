@@ -7,7 +7,7 @@
  * Unlike the colour rules, font size has essentially no trade-off
  * space: the fix is "make it at least the recommended minimum". So
  * each issue gets a single recommendation that bumps the size up to
- * its threshold — the smallest change that satisfies the guideline,
+ * its threshold - the smallest change that satisfies the guideline,
  * which also minimises the risk of crowding dense tick labels or
  * widening the chart. We deliberately do NOT offer a larger
  * "comfortable" value, to avoid manufacturing a trade-off that isn't
@@ -20,13 +20,13 @@
  *
  * ─── Where the fix is written (determined by issue.source) ───────
  *
- * The author doesn't choose the location — it's dictated by where the
+ * The author doesn't choose the location - it's dictated by where the
  * too-small value lives, mirroring how Vega-Lite resolves sizes
  * (inline overrides config overrides default):
  *
  *   inline  → the issue pointer addresses the number itself
  *             (e.g. /encoding/x/axis/labelFontSize). Replace it in
- *             place. A config-level fix wouldn't help — the inline
+ *             place. A config-level fix wouldn't help - the inline
  *             value would still override it.
  *
  *   config  → the issue pointer addresses the config number
@@ -63,7 +63,7 @@ interface FontSizeEvidence {
   configKey: string;
   /** Title-level vs label-level element (selects the threshold). */
   role: 'title' | 'label';
-  /** Where the current value comes from — decides where the fix goes. */
+  /** Where the current value comes from - decides where the fix goes. */
   source: 'inline' | 'config' | 'default';
 }
 
@@ -131,12 +131,12 @@ function buildFontSizeBump(args: {
       const evidence = readFontSizeEvidence(issue);
       if (!evidence) return spec;
 
-      // inline & config: the pointer is the number — replace it.
+      // inline & config: the pointer is the number - replace it.
       if (evidence.source === 'inline' || evidence.source === 'config') {
         return setValueAt(spec, issue.jsonPointer, args.targetSize);
       }
 
-      // default: nothing set yet — write it into config, which is
+      // default: nothing set yet - write it into config, which is
       // robust to missing axis/legend blocks and string titles.
       return setConfigProperty(
         spec,
@@ -174,7 +174,4 @@ export const increaseLabelFontSize = buildFontSizeBump({
 
 // ─── Registry ────────────────────────────────────────────────────
 
-export const fontSizeRecommendations: Recommendation[] = [
-  increaseTitleFontSize,
-  increaseLabelFontSize,
-];
+export const fontSizeRecommendations: Recommendation[] = [increaseTitleFontSize, increaseLabelFontSize];

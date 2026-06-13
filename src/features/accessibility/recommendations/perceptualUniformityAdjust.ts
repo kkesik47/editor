@@ -9,7 +9,7 @@
  * resolve each candidate to colours at the same 16-sample density the
  * rule uses, and run it through the RULE'S OWN ANALYSIS FUNCTIONS
  * (`analyzePerceptualUniformity` / `analyzeDivergingUniformity`). A
- * scheme only survives if that analysis would classify it as "ok" —
+ * scheme only survives if that analysis would classify it as "ok" -
  * i.e. the rule would not flag it.
  *
  * Reusing the rule's analysis (instead of recomputing) keeps "uniform"
@@ -59,7 +59,7 @@ const CONTINUOUS_SAMPLE_COUNT = 16;
 //
 // We resolve schemes locally rather than reaching into
 // resolveScaleColors' private helpers, to keep the recommendations
-// module decoupled from the rule's internals — same approach as
+// module decoupled from the rule's internals - same approach as
 // lightnessAdjust / contrastAdjust.
 
 /**
@@ -68,7 +68,7 @@ const CONTINUOUS_SAMPLE_COUNT = 16;
  *
  * Returns null for unknown schemes or anything that isn't a continuous
  * interpolator. Sequential and diverging schemes are both continuous
- * (interpolator functions), which is all this helper needs — the rule
+ * (interpolator functions), which is all this helper needs - the rule
  * never runs uniformity analysis on discrete categorical schemes.
  */
 function resolveSchemeColors(schemeName: string): string[] | null {
@@ -104,11 +104,8 @@ function isDivergingUniform(colors: string[]): boolean {
   const halfIsOk = (cv: number, maxMinRatio: number): boolean =>
     cv <= CV_OK_THRESHOLD && maxMinRatio <= MAX_MIN_RATIO_HALF_THRESHOLD;
 
-  // Both halves must be uniform — the rule fires if EITHER one isn't.
-  return (
-    halfIsOk(a.left.cv, a.left.maxMinRatio) &&
-    halfIsOk(a.right.cv, a.right.maxMinRatio)
-  );
+  // Both halves must be uniform - the rule fires if EITHER one isn't.
+  return halfIsOk(a.left.cv, a.left.maxMinRatio) && halfIsOk(a.right.cv, a.right.maxMinRatio);
 }
 
 // ─── Public API ──────────────────────────────────────────────────
@@ -119,7 +116,7 @@ function isDivergingUniform(colors: string[]): boolean {
  *
  * Only schemes matching the requested scale shape are considered, and
  * the original scheme (if any) is excluded so we never offer the same
- * one back. Returns an empty array when no candidate passes — at which
+ * one back. Returns an empty array when no candidate passes - at which
  * point the caller's `applicableWhen` should drop the recommendation
  * entirely.
  */
@@ -129,12 +126,9 @@ export function findUniformSchemes(args: {
 }): SchemeEntry[] {
   const exclude = args.excludeSchemeName?.toLowerCase().replace(/-\d+$/, '');
 
-  const candidates = SCHEME_CATALOG.filter(
-    (s) => s.type === args.scaleType && s.name !== exclude,
-  );
+  const candidates = SCHEME_CATALOG.filter((s) => s.type === args.scaleType && s.name !== exclude);
 
-  const predicate =
-    args.scaleType === 'sequential' ? isSequentialUniform : isDivergingUniform;
+  const predicate = args.scaleType === 'sequential' ? isSequentialUniform : isDivergingUniform;
 
   const uniform: SchemeEntry[] = [];
   for (const candidate of candidates) {

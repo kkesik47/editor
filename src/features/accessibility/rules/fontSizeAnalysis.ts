@@ -12,14 +12,14 @@
  *   2. Config block       (e.g. config.axis.labelFontSize)
  *   3. Vega-Lite defaults (hardcoded fallback values)
  *
- * The first defined value wins — this mirrors how Vega-Lite itself
+ * The first defined value wins - this mirrors how Vega-Lite itself
  * resolves configuration.
  *
  * Composition-aware:
  *   The spec is walked as a tree, so font-bearing elements are found
  *   inside layer / concat / facet compositions, not just at the top
- *   level. (Without this, wrapping a chart in a `layer` — e.g. when the
- *   colour-only fix adds a text-label layer — would hide every font
+ *   level. (Without this, wrapping a chart in a `layer` - e.g. when the
+ *   colour-only fix adds a text-label layer - would hide every font
  *   element from this rule.) Config is global, so it is always resolved
  *   from the ROOT spec; inline values come from the local view node.
  *
@@ -64,7 +64,7 @@ export const LABEL_FONT_SIZE_THRESHOLD = 13;
 // https://github.com/vega/vega/blob/main/packages/vega-parser/src/config.js
 const DEFAULT_TITLE_FONT_SIZE = 13;
 const DEFAULT_AXIS_LABEL_FONT_SIZE = 10;
-const DEFAULT_AXIS_TITLE_FONT_SIZE = 11;   // was 10
+const DEFAULT_AXIS_TITLE_FONT_SIZE = 11; // was 10
 const DEFAULT_LEGEND_LABEL_FONT_SIZE = 10;
 const DEFAULT_LEGEND_TITLE_FONT_SIZE = 11; // was 10
 const DEFAULT_TEXT_MARK_FONT_SIZE = 11;
@@ -114,7 +114,7 @@ export interface FontSizeEntry {
   /**
    * Identity of the RENDERED element this entry describes, used to
    * de-duplicate. Sibling layers share one x/y axis; channels on the
-   * same field share one merged legend — entries with the same key are
+   * same field share one merged legend - entries with the same key are
    * collapsed to one. Keyed by coordinate system so concatenated views
    * (which have their own axes/legends) are never merged together.
    */
@@ -198,13 +198,8 @@ interface ChannelFontSizeParams {
  * local view node (read by the caller into params.inlineValue); config
  * is global and so is read here from `rootSpec`.
  */
-function resolveChannelFontSize(
-  rootSpec: Record<string, any>,
-  params: ChannelFontSizeParams,
-): FontSizeEntry {
-  const threshold = params.role === 'title'
-    ? TITLE_FONT_SIZE_THRESHOLD
-    : LABEL_FONT_SIZE_THRESHOLD;
+function resolveChannelFontSize(rootSpec: Record<string, any>, params: ChannelFontSizeParams): FontSizeEntry {
+  const threshold = params.role === 'title' ? TITLE_FONT_SIZE_THRESHOLD : LABEL_FONT_SIZE_THRESHOLD;
 
   // 1. Inline value on this specific channel
   if (typeof params.inlineValue === 'number') {
@@ -220,7 +215,7 @@ function resolveChannelFontSize(
     };
   }
 
-  // 2. Config block (applies to all channels of this type) — from ROOT
+  // 2. Config block (applies to all channels of this type) - from ROOT
   const configValue = readPath(rootSpec, params.configPath);
   if (typeof configValue === 'number') {
     return {
@@ -272,9 +267,7 @@ function checkChartTitle(
     label: 'Chart title',
     configKey: 'title.fontSize',
     role: 'title',
-    inlineValue: typeof node.title === 'object' && !Array.isArray(node.title)
-      ? node.title.fontSize
-      : undefined,
+    inlineValue: typeof node.title === 'object' && !Array.isArray(node.title) ? node.title.fontSize : undefined,
     inlinePointer: `${pointer}/title/fontSize`,
     configPath: ['config', 'title', 'fontSize'],
     defaultSize: DEFAULT_TITLE_FONT_SIZE,
@@ -290,7 +283,7 @@ function checkChartTitle(
  *
  * Only x and y: xOffset / yOffset position marks within a band but
  * render no labelled axis of their own, so they have no axis font to
- * check. (For colour-only detection they're treated separately — see
+ * check. (For colour-only detection they're treated separately - see
  * colorOnlyEncodingRule.)
  */
 const AXIS_CHANNELS = ['x', 'y'];
@@ -310,8 +303,8 @@ function axisOrientation(channel: string): 'x' | 'y' {
  * Pick the best JSON pointer for a default axis font-size issue.
  *
  * If the author already has an `axis` object on this channel, point to
- * it — that's where they'd add `labelFontSize`. Otherwise point to the
- * encoding channel — they need to create the `axis` block first.
+ * it - that's where they'd add `labelFontSize`. Otherwise point to the
+ * encoding channel - they need to create the `axis` block first.
  *
  *   { "x": { "field": "date", "axis": { "title": "Date" } } }
  *   → pointer: <prefix>/encoding/x/axis  (axis exists, add property here)
@@ -319,11 +312,7 @@ function axisOrientation(channel: string): 'x' | 'y' {
  *   { "x": { "field": "date" } }
  *   → pointer: <prefix>/encoding/x       (no axis yet, create it here)
  */
-function axisDefaultPointer(
-  node: Record<string, any>,
-  channel: string,
-  pointer: string,
-): string {
+function axisDefaultPointer(node: Record<string, any>, channel: string, pointer: string): string {
   return hasObjectAtPath(node, ['encoding', channel, 'axis'])
     ? `${pointer}/encoding/${channel}/axis`
     : `${pointer}/encoding/${channel}`;
@@ -409,11 +398,7 @@ const LEGEND_LABELS: Record<string, string> = {
  * Same logic as axisDefaultPointer: point to the `legend` object if it
  * exists, otherwise to the channel itself.
  */
-function legendDefaultPointer(
-  node: Record<string, any>,
-  channel: string,
-  pointer: string,
-): string {
+function legendDefaultPointer(node: Record<string, any>, channel: string, pointer: string): string {
   return hasObjectAtPath(node, ['encoding', channel, 'legend'])
     ? `${pointer}/encoding/${channel}/legend`
     : `${pointer}/encoding/${channel}`;
@@ -501,7 +486,7 @@ function checkLegendChannel(
  *
  * Text marks render data values as on-chart text (e.g. the row
  * labels around a Likert plot). That text is data-label text, so the
- * LABEL threshold (13 px) applies — same tier as axis tick labels and
+ * LABEL threshold (13 px) applies - same tier as axis tick labels and
  * legend entry labels.
  *
  * Resolution order:
@@ -513,7 +498,7 @@ function checkLegendChannel(
  * an empty array because a view has at most one mark.
  *
  * elementKey embeds the full view pointer, so two sibling text-mark
- * layers stay distinct under dedupeByElement — they may carry
+ * layers stay distinct under dedupeByElement - they may carry
  * different inline sizes and must not collapse to one entry.
  */
 function checkTextMark(
@@ -525,9 +510,7 @@ function checkTextMark(
 
   const mark = node.mark;
   const inlineValue =
-    mark && typeof mark === 'object' && !Array.isArray(mark)
-      ? (mark as Record<string, any>).fontSize
-      : undefined;
+    mark && typeof mark === 'object' && !Array.isArray(mark) ? (mark as Record<string, any>).fontSize : undefined;
 
   return resolveChannelFontSize(rootSpec, {
     label: 'Text mark labels',
@@ -539,7 +522,7 @@ function checkTextMark(
     defaultSize: DEFAULT_TEXT_MARK_FONT_SIZE,
     // The mark property is guaranteed to exist on this view (we
     // returned null otherwise), so it's a safe default target whether
-    // it's a shorthand string or an object — Monaco can underline
+    // it's a shorthand string or an object - Monaco can underline
     // either form.
     defaultPointer: `${pointer}/mark`,
     elementKey: `text-mark:${pointer}`,
@@ -559,7 +542,7 @@ interface ViewNode {
  *
  * Font-bearing elements live on units (encoding) and on view-level
  * titles, both of which can appear inside layer / concat / facet
- * compositions — not just at the top level. Container nodes (e.g. a
+ * compositions - not just at the top level. Container nodes (e.g. a
  * bare layer wrapper) are included too: they carry no encoding so
  * axis/legend checks skip them, but they may carry a `title`.
  */
@@ -569,13 +552,11 @@ function collectViewNodes(node: unknown, pointer: string, out: ViewNode[]): void
   out.push({node: obj, pointer});
 
   if (Array.isArray(obj.layer)) {
-    obj.layer.forEach((c: unknown, i: number) =>
-      collectViewNodes(c, `${pointer}/layer/${i}`, out));
+    obj.layer.forEach((c: unknown, i: number) => collectViewNodes(c, `${pointer}/layer/${i}`, out));
   }
   for (const key of ['hconcat', 'vconcat', 'concat'] as const) {
     if (Array.isArray(obj[key])) {
-      (obj[key] as unknown[]).forEach((c, i) =>
-        collectViewNodes(c, `${pointer}/${key}/${i}`, out));
+      (obj[key] as unknown[]).forEach((c, i) => collectViewNodes(c, `${pointer}/${key}/${i}`, out));
     }
   }
   if (obj.spec) collectViewNodes(obj.spec, `${pointer}/spec`, out);
@@ -622,8 +603,7 @@ function dedupeByElement(entries: FontSizeEntry[]): FontSizeEntry[] {
     }
     const better =
       SOURCE_RANK[entry.source] > SOURCE_RANK[existing.source] ||
-      (SOURCE_RANK[entry.source] === SOURCE_RANK[existing.source] &&
-        entry.effectiveSize < existing.effectiveSize);
+      (SOURCE_RANK[entry.source] === SOURCE_RANK[existing.source] && entry.effectiveSize < existing.effectiveSize);
     if (better) byKey.set(entry.elementKey, entry);
   }
   return [...byKey.values()];
@@ -643,9 +623,7 @@ function dedupeByElement(entries: FontSizeEntry[]): FontSizeEntry[] {
  * @param spec - A parsed Vega-Lite specification object.
  * @returns Analysis result with all entries and those below threshold.
  */
-export function analyzeFontSizes(
-  spec: Record<string, any>,
-): FontSizeAnalysisResult {
+export function analyzeFontSizes(spec: Record<string, any>): FontSizeAnalysisResult {
   const entries: FontSizeEntry[] = [];
 
   const views: ViewNode[] = [];

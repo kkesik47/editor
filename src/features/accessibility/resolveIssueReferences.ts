@@ -7,23 +7,23 @@
  *
  * Resolution order (most-specific to least-specific):
  *
- *   1. Issue-level `references` — most specific. Used when a single
+ *   1. Issue-level `references` - most specific. Used when a single
  *      rule can fire for materially different reasons that warrant
  *      different citations. Example: contrastRule emits text-AA
  *      issues citing WCAG 1.4.3, text-AAA issues citing 1.4.6, and
- *      non-text issues citing 1.4.11 — each issue carries its own
+ *      non-text issues citing 1.4.11 - each issue carries its own
  *      precise reference, while the rule lists all three.
  *
- *   2. Rule-level `references` — found by matching the issue's
+ *   2. Rule-level `references` - found by matching the issue's
  *      `ruleId` against each registered rule. Match logic accepts
  *      either an exact equal (`issue.ruleId === rule.id`) or a
  *      hierarchical prefix (`issue.ruleId.startsWith(rule.id + ':')`).
  *
- *   3. Empty array — if no rule matches, no references are shown.
+ *   3. Empty array - if no rule matches, no references are shown.
  *      The renderer should handle this gracefully (hiding the
  *      "Based on:" line entirely).
  *
- * Special case — colorRiskRule:
+ * Special case - colorRiskRule:
  *
  *   The rule's id is 'vl-a11y-color-risk-engine', but its issues
  *   inherit their ID prefix from the knowledge-base JSON file,

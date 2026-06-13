@@ -2,7 +2,7 @@
  * perceptualUniformityRule.ts
  *
  * Accessibility rule that checks whether ordered color scales have
- * perceptually uniform steps — equal data intervals should produce
+ * perceptually uniform steps - equal data intervals should produce
  * equal perceived color changes.
  *
  * Non-uniform scales (like rainbow) create false visual boundaries
@@ -28,13 +28,13 @@
  *   come from that half, while the gradient preview still shows the
  *   full scale (so the user stays oriented to what they're editing).
  *
- * Categorical scales are skipped — they have no notion of
+ * Categorical scales are skipped - they have no notion of
  * consecutive steps to measure.
  *
  * Architecture:
- *   1. resolveScaleColors            — reused from CVD/lightness rules
- *   2. perceptualUniformityAnalysis  — compute step ΔE and evenness
- *   3. this file                     — orchestrate and produce issues
+ *   1. resolveScaleColors            - reused from CVD/lightness rules
+ *   2. perceptualUniformityAnalysis  - compute step ΔE and evenness
+ *   3. this file                     - orchestrate and produce issues
  */
 
 import type {AccessibilityIssue, AccessibilityRule} from '../types.js';
@@ -67,22 +67,18 @@ interface DomainInfo {
  * the encoding channel that produced this scale.
  *
  * Only returns a domain when scale.domain is an explicit two-element
- * numeric array — inferred domains from data are not available at
+ * numeric array - inferred domains from data are not available at
  * spec-analysis time. Three-element domains (the diverging case) are
  * intentionally skipped, because the preview formatter expects
  * [min, max] for percentage interpolation.
  */
-function resolveDomainInfo(
-  spec: Record<string, any>,
-  channel: string,
-): DomainInfo {
+function resolveDomainInfo(spec: Record<string, any>, channel: string): DomainInfo {
   const channelDef = spec?.encoding?.[channel];
   if (!channelDef || typeof channelDef !== 'object') {
     return {fieldName: null, domain: null};
   }
 
-  const fieldName =
-    typeof channelDef.field === 'string' ? channelDef.field : null;
+  const fieldName = typeof channelDef.field === 'string' ? channelDef.field : null;
 
   const rawDomain = channelDef?.scale?.domain;
   let domain: [number, number] | null = null;
@@ -113,14 +109,10 @@ type UniformityVerdict = 'warning' | 'info' | 'jump' | 'ok';
  *
  * The `maxMinRatioThreshold` parameter is what lets sequential and
  * diverging analyses share this function but use different jump
- * thresholds — see MAX_MIN_RATIO_THRESHOLD vs
+ * thresholds - see MAX_MIN_RATIO_THRESHOLD vs
  * MAX_MIN_RATIO_HALF_THRESHOLD in the analysis module.
  */
-function classify(
-  cv: number,
-  maxMinRatio: number,
-  maxMinRatioThreshold: number,
-): UniformityVerdict {
+function classify(cv: number, maxMinRatio: number, maxMinRatioThreshold: number): UniformityVerdict {
   if (cv > CV_WARNING_THRESHOLD) return 'warning';
   if (cv > CV_OK_THRESHOLD) return 'info';
   if (maxMinRatio > maxMinRatioThreshold) return 'jump';
@@ -198,7 +190,7 @@ function buildSequentialEvidence(
  * Headline `cv` / `maxMinRatio` / `mean` / `stdDev` etc. come from
  * the worst-performing half (so the user-visible message matches
  * what triggered the warning). `steps` are also from the worst half
- * — these drive the renderer's "biggest / smallest color change"
+ * - these drive the renderer's "biggest / smallest color change"
  * rows, localizing the diagnostic to where the actual problem lives.
  *
  * `colorCount` stays as the full scale length, which keeps the
@@ -231,7 +223,7 @@ function buildDivergingEvidence(
     // The renderer normally reconstructs the gradient bar from `steps`.
     // For diverging issues, `steps` only covers the failing half, so we
     // pass the full ordered color list separately and let the preview
-    // draw the whole scale as the gradient (option (a) — keeps the user
+    // draw the whole scale as the gradient (option (a) - keeps the user
     // oriented to the scale they're editing) while the biggest /
     // smallest pair rows come from the half.
     gradientColors: scale.colors,
@@ -267,7 +259,7 @@ function buildSequentialWarning(
     ruleId: 'vl-a11y-perceptual-uniformity:high-cv',
     severity: 'info',
     message:
-      `The '${scale.channel}' sequential scale${schemeNoteFor(scale)} is ` +
+      `The sequential ${scale.channel} scale${schemeNoteFor(scale)} is ` +
       `not perceptually uniform. When moving between equally spaced ` +
       `data values, some intervals produce a large visible color ` +
       `change while others produce almost none ` +
@@ -294,15 +286,14 @@ function buildSequentialInfo(
     ruleId: 'vl-a11y-perceptual-uniformity:moderate-cv',
     severity: 'info',
     message:
-      `The '${scale.channel}' sequential scale${schemeNoteFor(scale)} has ` +
+      `The sequential ${scale.channel} scale${schemeNoteFor(scale)} has ` +
       `somewhat uneven color distribution. When moving between equally ` +
       `spaced data values, some intervals produce a noticeably larger ` +
       `color change than others (${analysis.maxMinRatio}× difference). ` +
       `Unevenness score (CV): ${analysis.cv} (0 = perfectly even, ` +
       `above 0.3 = problematic). This may not faithfully represent the data.`,
     suggestion:
-      'For more faithful data representation, consider a perceptually ' +
-      'uniform scheme like "viridis" or "cividis".',
+      'For more faithful data representation, consider a perceptually ' + 'uniform scheme like "viridis" or "cividis".',
     jsonPointer: scale.jsonPointer,
     evidence: buildSequentialEvidence(scale, analysis, domainInfo),
   };
@@ -317,8 +308,8 @@ function buildSequentialJump(
     ruleId: 'vl-a11y-perceptual-uniformity:localized-jump',
     severity: 'info',
     message:
-      `The '${scale.channel}' sequential scale${schemeNoteFor(scale)} has ` +
-      `a sudden color jump — at one point in the scale, the color ` +
+      `The sequential ${scale.channel} scale${schemeNoteFor(scale)} has ` +
+      `a sudden color jump - at one point in the scale, the color ` +
       `changes ${analysis.maxMinRatio}× more than at the smoothest ` +
       `point. This creates a false visual boundary, making it look ` +
       `like there is a sharp break in the data when there may not be one.`,
@@ -345,7 +336,7 @@ function buildDivergingWarning(
     ruleId: 'vl-a11y-perceptual-uniformity:high-cv',
     severity: 'info',
     message:
-      `The '${scale.channel}' diverging scale${schemeNoteFor(scale)} is ` +
+      `The diverging ${scale.channel} scale${schemeNoteFor(scale)} is ` +
       `not perceptually uniform within its ${sideText}. When moving ` +
       `between equally spaced data values on that side of the midpoint, ` +
       `some intervals produce a large visible color change while others ` +
@@ -375,7 +366,7 @@ function buildDivergingInfo(
     ruleId: 'vl-a11y-perceptual-uniformity:moderate-cv',
     severity: 'info',
     message:
-      `The '${scale.channel}' diverging scale${schemeNoteFor(scale)} has ` +
+      `The diverging ${scale.channel} scale${schemeNoteFor(scale)} has ` +
       `somewhat uneven color distribution within its ${sideText}. Some ` +
       `intervals produce a noticeably larger color change than others ` +
       `(${worst.maxMinRatio}× difference). Unevenness score (CV): ` +
@@ -401,8 +392,8 @@ function buildDivergingJump(
     ruleId: 'vl-a11y-perceptual-uniformity:localized-jump',
     severity: 'info',
     message:
-      `The '${scale.channel}' diverging scale${schemeNoteFor(scale)} has ` +
-      `a sudden color jump within its ${sideText} — at one point, the ` +
+      `The diverging ${scale.channel} scale${schemeNoteFor(scale)} has ` +
+      `a sudden color jump within its ${sideText} - at one point, the ` +
       `color changes ${worst.maxMinRatio}× more than at the smoothest ` +
       `point on that side. This creates a false visual boundary, making ` +
       `it look like there is a sharp break in the data when there may ` +
@@ -421,18 +412,11 @@ function buildDivergingJump(
 /**
  * Evaluate one sequential scale and emit at most one issue.
  */
-function evaluateSequential(
-  scale: ResolvedScale,
-  domainInfo: DomainInfo,
-): AccessibilityIssue | null {
+function evaluateSequential(scale: ResolvedScale, domainInfo: DomainInfo): AccessibilityIssue | null {
   const analysis = analyzePerceptualUniformity(scale.colors);
   if (!analysis.hasSufficientColors) return null;
 
-  const verdict = classify(
-    analysis.cv,
-    analysis.maxMinRatio,
-    MAX_MIN_RATIO_THRESHOLD,
-  );
+  const verdict = classify(analysis.cv, analysis.maxMinRatio, MAX_MIN_RATIO_THRESHOLD);
 
   switch (verdict) {
     case 'warning':
@@ -456,23 +440,12 @@ function evaluateSequential(
  *     labelled "both" in the message; the half with higher CV
  *     drives the headline numbers and the renderer pairs.
  */
-function evaluateDiverging(
-  scale: ResolvedScale,
-  domainInfo: DomainInfo,
-): AccessibilityIssue | null {
+function evaluateDiverging(scale: ResolvedScale, domainInfo: DomainInfo): AccessibilityIssue | null {
   const analysis = analyzeDivergingUniformity(scale.colors);
   if (!analysis.hasSufficientColors) return null;
 
-  const leftVerdict = classify(
-    analysis.left.cv,
-    analysis.left.maxMinRatio,
-    MAX_MIN_RATIO_HALF_THRESHOLD,
-  );
-  const rightVerdict = classify(
-    analysis.right.cv,
-    analysis.right.maxMinRatio,
-    MAX_MIN_RATIO_HALF_THRESHOLD,
-  );
+  const leftVerdict = classify(analysis.left.cv, analysis.left.maxMinRatio, MAX_MIN_RATIO_HALF_THRESHOLD);
+  const rightVerdict = classify(analysis.right.cv, analysis.right.maxMinRatio, MAX_MIN_RATIO_HALF_THRESHOLD);
 
   if (leftVerdict === 'ok' && rightVerdict === 'ok') return null;
 
@@ -493,8 +466,7 @@ function evaluateDiverging(
     side = 'upper';
   } else {
     // Tied at the same non-ok verdict on both halves.
-    worstHalf =
-      analysis.left.cv >= analysis.right.cv ? analysis.left : analysis.right;
+    worstHalf = analysis.left.cv >= analysis.right.cv ? analysis.left : analysis.right;
     worstVerdict = leftVerdict; // == rightVerdict here
     side = 'both';
   }
@@ -533,9 +505,7 @@ export const perceptualUniformityRule: AccessibilityRule = {
       const domainInfo = resolveDomainInfo(spec, scale.channel);
 
       const issue =
-        scale.scaleType === 'diverging'
-          ? evaluateDiverging(scale, domainInfo)
-          : evaluateSequential(scale, domainInfo);
+        scale.scaleType === 'diverging' ? evaluateDiverging(scale, domainInfo) : evaluateSequential(scale, domainInfo);
 
       if (issue) issues.push(issue);
     }

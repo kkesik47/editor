@@ -15,7 +15,7 @@
  * Resolution order for text colors (same pattern as fontSizeAnalysis):
  *   1. Inline property  (e.g. encoding.x.axis.labelColor)
  *   2. Config block     (e.g. config.axis.labelColor)
- *   3. Vega-Lite default (#000000 — black)
+ *   3. Vega-Lite default (#000000 - black)
  *
  * Background resolution order:
  *   1. spec.background
@@ -26,7 +26,7 @@
  * Scale contrast (non-text):
  *   Only checked for categorical scales (nominal / ordinal).
  *   Sequential and diverging scales are skipped because individual
- *   colors in a gradient are not meant to stand on their own —
+ *   colors in a gradient are not meant to stand on their own -
  *   their distinguishability is handled by lightnessContrastRule
  *   and colorblindSafetyRule instead.
  */
@@ -65,11 +65,7 @@ export function colorToRgb(color: string): [number, number, number] | null {
   const rgb = toRgb(parsed);
   if (!rgb) return null;
 
-  return [
-    Math.round(rgb.r * 255),
-    Math.round(rgb.g * 255),
-    Math.round(rgb.b * 255),
-  ];
+  return [Math.round(rgb.r * 255), Math.round(rgb.g * 255), Math.round(rgb.b * 255)];
 }
 
 /**
@@ -79,9 +75,7 @@ export function colorToRgb(color: string): [number, number, number] | null {
  * as specified in WCAG 2.1's relative luminance definition.
  */
 function srgbToLinear(c: number): number {
-  return c <= 0.04045
-    ? c / 12.92
-    : Math.pow((c + 0.055) / 1.055, 2.4);
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
 /**
@@ -90,11 +84,7 @@ function srgbToLinear(c: number): number {
  * Range: 0 (black) to 1 (white).
  */
 export function relativeLuminance(r: number, g: number, b: number): number {
-  return (
-    0.2126 * srgbToLinear(r / 255) +
-    0.7152 * srgbToLinear(g / 255) +
-    0.0722 * srgbToLinear(b / 255)
-  );
+  return 0.2126 * srgbToLinear(r / 255) + 0.7152 * srgbToLinear(g / 255) + 0.0722 * srgbToLinear(b / 255);
 }
 
 /**
@@ -103,10 +93,7 @@ export function relativeLuminance(r: number, g: number, b: number): number {
  * Returns a value from 1 (identical) to 21 (black on white).
  * Returns null if either color cannot be parsed.
  */
-export function computeContrastRatio(
-  color1: string,
-  color2: string,
-): number | null {
+export function computeContrastRatio(color1: string, color2: string): number | null {
   const rgb1 = colorToRgb(color1);
   const rgb2 = colorToRgb(color2);
   if (!rgb1 || !rgb2) return null;
@@ -222,6 +209,60 @@ export interface ContrastAnalysisResult {
 // ─── Helpers ─────────────────────────────────────────────────────
 
 /**
+ * Compute the contrast of any stroke defined on a mark/unit against
+ * the background. We check inline `mark.stroke` and
+ * `encoding.stroke.value` - data-driven strokes
+ * (`encoding.stroke.field`) are skipped because we cannot statically
+ * guarantee the resolved colour.
+ *
+ * Returns true when at least one stroke source clears the non-text
+ * AA threshold - i.e. the mark has a perceivable boundary against the
+ * background regardless of its fill.
+ */
+function hasContrastingStroke(unit: Record<string, any>, bg: string): boolean {
+  const strokes: string[] = [];
+
+  const mark = unit?.mark;
+  if (mark && typeof mark === 'object' && typeof mark.stroke === 'string') {
+    strokes.push(mark.stroke);
+  }
+
+  const encodingStrokeValue = unit?.encoding?.stroke?.value;
+  if (typeof encodingStrokeValue === 'string') {
+    strokes.push(encodingStrokeValue);
+  }
+
+  for (const s of strokes) {
+    const ratio = computeContrastRatio(s, bg);
+    if (ratio != null && ratio >= NON_TEXT_AA_THRESHOLD) return true;
+  }
+  return false;
+}
+
+/**
+ * Walk a scale's JSON pointer back to the unit specification that
+ * owns it. Scale pointers always end in `…/encoding/<channel>/scale/<…>`,
+ * so the path before the first `encoding` segment addresses the unit.
+ *
+ *   /layer/5/encoding/fill/scale/range → spec.layer[5]
+ *   /encoding/color/scale/scheme       → spec
+ *
+ * Returns null when the pointer doesn't match the expected shape.
+ */
+function findUnitFromPointer(spec: Record<string, any>, pointer: string): Record<string, any> | null {
+  const segments = pointer.split('/').filter(Boolean);
+  const encIdx = segments.indexOf('encoding');
+  if (encIdx === -1) return null;
+
+  let current: any = spec;
+  for (let i = 0; i < encIdx; i++) {
+    if (current == null || typeof current !== 'object') return null;
+    current = current[segments[i]];
+  }
+  return current && typeof current === 'object' ? current : null;
+}
+
+/**
  * Read a nested property from an object by following a path of keys.
  */
 function readPath(obj: Record<string, any>, path: string[]): unknown {
@@ -248,9 +289,7 @@ function hasObjectAtPath(obj: Record<string, any>, path: string[]): boolean {
  *
  * Checks: spec.background → config.background → config.view.fill → white.
  */
-export function resolveBackground(
-  spec: Record<string, any>,
-): {color: string; source: string} {
+export function resolveBackground(spec: Record<string, any>): {color: string; source: string} {
   if (typeof spec.background === 'string') {
     return {color: spec.background, source: 'spec.background'};
   }
@@ -285,11 +324,7 @@ interface TextColorParams {
  *
  * Priority: inline → config → default (black).
  */
-function resolveTextColor(
-  spec: Record<string, any>,
-  bg: string,
-  params: TextColorParams,
-): TextContrastEntry {
+function resolveTextColor(spec: Record<string, any>, bg: string, params: TextColorParams): TextContrastEntry {
   // 1. Inline value
   if (typeof params.inlineValue === 'string') {
     const ratio = computeContrastRatio(params.inlineValue, bg);
@@ -348,10 +383,7 @@ function checkTitleContrast(
   return resolveTextColor(rootSpec, bg, {
     label: 'Chart title',
     configKey: 'title.color',
-    inlineValue:
-      typeof node.title === 'object' && !Array.isArray(node.title)
-        ? node.title.color
-        : undefined,
+    inlineValue: typeof node.title === 'object' && !Array.isArray(node.title) ? node.title.color : undefined,
     inlinePointer: `${pointer}/title/color`,
     configPath: ['config', 'title', 'color'],
     defaultPointer: `${pointer}/title`,
@@ -369,13 +401,8 @@ const AXIS_LABELS_MAP: Record<string, string> = {
   yOffset: 'Y-offset axis',
 };
 
-function axisDefaultPointer(
-  spec: Record<string, any>,
-  channel: string,
-): string {
-  return hasObjectAtPath(spec, ['encoding', channel, 'axis'])
-    ? `/encoding/${channel}/axis`
-    : `/encoding/${channel}`;
+function axisDefaultPointer(spec: Record<string, any>, channel: string): string {
+  return hasObjectAtPath(spec, ['encoding', channel, 'axis']) ? `/encoding/${channel}/axis` : `/encoding/${channel}`;
 }
 
 /**
@@ -429,10 +456,7 @@ const LEGEND_LABELS_MAP: Record<string, string> = {
   opacity: 'Opacity legend',
 };
 
-function legendDefaultPointer(
-  spec: Record<string, any>,
-  channel: string,
-): string {
+function legendDefaultPointer(spec: Record<string, any>, channel: string): string {
   return hasObjectAtPath(spec, ['encoding', channel, 'legend'])
     ? `/encoding/${channel}/legend`
     : `/encoding/${channel}`;
@@ -486,21 +510,23 @@ const COLOR_PROPS = ['color', 'fill', 'stroke'] as const;
  *
  * Handles layer, hconcat, vconcat, concat compositions.
  */
-function collectMarkColors(
-  node: unknown,
-  pointer: string,
-  bg: string,
-  entries: MarkContrastEntry[],
-): void {
+function collectMarkColors(node: unknown, pointer: string, bg: string, entries: MarkContrastEntry[]): void {
   if (!node || typeof node !== 'object' || Array.isArray(node)) return;
 
   const obj = node as Record<string, any>;
+
+  // A contrasting stroke on the same mark delineates fill/color from
+  // the background (WCAG 1.4.11 cares about a perceivable boundary).
+  // The stroke channel itself is never suppressed - it IS the boundary.
+  const strokeCompensates = hasContrastingStroke(obj, bg);
 
   // Check mark properties at this level
   const mark = obj.mark;
   if (mark && typeof mark === 'object' && !Array.isArray(mark)) {
     for (const prop of COLOR_PROPS) {
       if (typeof mark[prop] === 'string') {
+        if (strokeCompensates && (prop === 'fill' || prop === 'color')) continue;
+
         const ratio = computeContrastRatio(mark[prop], bg);
         if (ratio != null) {
           entries.push({
@@ -521,6 +547,8 @@ function collectMarkColors(
     for (const prop of COLOR_PROPS) {
       const value = (encoding as Record<string, any>)[prop]?.value;
       if (typeof value === 'string') {
+        if (strokeCompensates && (prop === 'fill' || prop === 'color')) continue;
+
         const ratio = computeContrastRatio(value, bg);
         if (ratio != null) {
           entries.push({
@@ -555,7 +583,7 @@ function collectMarkColors(
  * Check each color in categorical scales against the background.
  *
  * Only categorical scales are checked here. In a categorical scale,
- * each color represents a distinct category — if one is invisible
+ * each color represents a distinct category - if one is invisible
  * against the background, an entire category disappears.
  *
  * Sequential and diverging scales are skipped because their colors
@@ -566,19 +594,24 @@ function collectMarkColors(
  * Returns one result per scale that has at least one failing color.
  * Reuses resolveScaleColors from the CVD rule for scale extraction.
  */
-function checkScaleContrast(
-  spec: Record<string, any>,
-  bg: string,
-): ScaleContrastResult[] {
+function checkScaleContrast(spec: Record<string, any>, bg: string): ScaleContrastResult[] {
   const scales = resolveScaleColors(spec);
   const results: ScaleContrastResult[] = [];
 
   for (const scale of scales) {
-    // Only check categorical scales — sequential/diverging colors
+    // Only check categorical scales - sequential/diverging colors
     // are part of a gradient and don't need to individually contrast
     // against the background.
     if (scale.scaleType !== 'categorical') {
       continue;
+    }
+
+    // Stroke compensation: a fill/color scale whose mark has a
+    // sufficiently contrasting stroke is delineated by that stroke,
+    // so individual swatches need not contrast against the background.
+    if (scale.channel === 'fill' || scale.channel === 'color') {
+      const unit = findUnitFromPointer(spec, scale.jsonPointer);
+      if (unit && hasContrastingStroke(unit, bg)) continue;
     }
 
     const failing: {color: string; ratio: number; index: number}[] = [];
@@ -621,8 +654,8 @@ function checkScaleContrast(
  * (title + per-axis + per-legend). Mirrors collectMarkColors so the
  * text and mark halves of the contrast analysis behave the same way.
  *
- * Without this walk, wrapping a chart in a `layer` — e.g. when the
- * colour-only fix adds a text-label layer — hides every text element
+ * Without this walk, wrapping a chart in a `layer` - e.g. when the
+ * colour-only fix adds a text-label layer - hides every text element
  * from this rule. The same argument is made by fontSizeAnalysis (see
  * its file header).
  *
@@ -678,18 +711,16 @@ function collectTextEntries(
  * Analyze contrast ratios throughout a Vega-Lite specification.
  *
  * Checks three categories against the resolved background:
- *   1. Text elements — titles, axis labels, legend labels
- *   2. Mark colors  — explicit mark.color/fill/stroke, encoding values
- *   3. Scale colors — each color in categorical scales only
+ *   1. Text elements - titles, axis labels, legend labels
+ *   2. Mark colors  - explicit mark.color/fill/stroke, encoding values
+ *   3. Scale colors - each color in categorical scales only
  *
  * Text color resolution: inline → config → Vega-Lite default (black).
  * Background resolution: spec → config → config.view.fill → white.
  *
  * @param spec - A parsed Vega-Lite specification object.
  */
-export function analyzeContrast(
-  spec: Record<string, any>,
-): ContrastAnalysisResult {
+export function analyzeContrast(spec: Record<string, any>): ContrastAnalysisResult {
   const bg = resolveBackground(spec);
 
   // Text colours (walks compositions, matches collectMarkColors)

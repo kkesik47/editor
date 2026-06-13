@@ -62,7 +62,7 @@ const rules = colorRules as ColorRulesKnowledgeBase;
 // ─── Color parsing (via culori) ──────────────────────────────────
 
 /**
- * Reusable HSL converter — same pattern used in contrastAnalysis.ts
+ * Reusable HSL converter - same pattern used in contrastAnalysis.ts
  * and cvdSimulation.ts. Instantiated once and reused.
  */
 const toHsl = converter('hsl');
@@ -74,14 +74,14 @@ const toHsl = converter('hsl');
  *   saturation : fraction in [0, 1]
  *   lightness  : fraction in [0, 1]
  *
- * Same scale colorRules.json already expects — no threshold changes.
+ * Same scale colorRules.json already expects - no threshold changes.
  *
  * Culori handles every CSS color form Vega-Lite users might write:
  * hex (#rgb, #rrggbb, #rrggbbaa), rgb()/rgba(), hsl()/hsla(), all
  * 147 named colors, plus lab/lch/oklab/oklch/hwb/color().
  *
  * Achromatic colors (pure grays, black, white) have no defined hue
- * in HSL — culori returns `hue: undefined` for them. We substitute
+ * in HSL - culori returns `hue: undefined` for them. We substitute
  * 0, which is safe because our `gray` and `black` family thresholds
  * bound on saturationMax (so hue is irrelevant for those matches).
  */
@@ -264,7 +264,7 @@ function evaluateColorCombinationRisk(
       }
 
       // Scheme names (e.g. "viridis", "rdylgn") are not parseable as
-      // colors — fall back to name-based family inference.
+      // colors - fall back to name-based family inference.
       if (entry.source.endsWith('scale.scheme')) {
         const families = inferFamiliesFromSchemeName(entry.normalized, knowledgeBase.families);
         if (families.length === 0) return null;

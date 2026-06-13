@@ -24,14 +24,10 @@ const LABEL_FONT_SIZE_PX = 13;
 
 /**
  * Set scale.scheme at the given pointer. If the scale currently has
- * an explicit `range`, that range is removed — scheme and range
+ * an explicit `range`, that range is removed - scheme and range
  * cannot both be set on the same scale in Vega-Lite.
  */
-export function setScheme(
-  spec: VegaLiteSpec,
-  scalePointer: string,
-  schemeName: string,
-): VegaLiteSpec {
+export function setScheme(spec: VegaLiteSpec, scalePointer: string, schemeName: string): VegaLiteSpec {
   return updateAt(spec, scalePointer, (scale) => {
     const current = (scale as Record<string, unknown>) ?? {};
     const {range: _omit, ...rest} = current;
@@ -43,11 +39,7 @@ export function setScheme(
  * Set scale.range to an explicit list of colors. If the scale
  * currently uses a named scheme, that scheme is removed.
  */
-export function setRange(
-  spec: VegaLiteSpec,
-  scalePointer: string,
-  colors: string[],
-): VegaLiteSpec {
+export function setRange(spec: VegaLiteSpec, scalePointer: string, colors: string[]): VegaLiteSpec {
   return updateAt(spec, scalePointer, (scale) => {
     const current = (scale as Record<string, unknown>) ?? {};
     const {scheme: _omit, ...rest} = current;
@@ -72,9 +64,7 @@ export function replaceColorInRange(
 ): VegaLiteSpec {
   return updateAt(spec, scalePointer, (scale) => {
     const current = (scale as Record<string, unknown>) ?? {};
-    const existingRange = Array.isArray(current.range)
-      ? [...(current.range as string[])]
-      : [...fallbackColors];
+    const existingRange = Array.isArray(current.range) ? [...(current.range as string[])] : [...fallbackColors];
 
     if (index < 0 || index >= existingRange.length) return current;
     existingRange[index] = newColor;
@@ -89,11 +79,7 @@ export function replaceColorInRange(
  * Used by recommendations that switch the scale's interpolation
  * behaviour without changing colors.
  */
-export function setScaleType(
-  spec: VegaLiteSpec,
-  scalePointer: string,
-  type: string,
-): VegaLiteSpec {
+export function setScaleType(spec: VegaLiteSpec, scalePointer: string, type: string): VegaLiteSpec {
   return updateAt(spec, scalePointer, (scale) => ({
     ...((scale as Record<string, unknown>) ?? {}),
     type,
@@ -110,7 +96,7 @@ export function setScaleType(
  * If the channel already exists it is overwritten. In practice the
  * triggering rule only fires when no other channel encodes the same
  * field, so an overwrite would only ever replace a channel encoding a
- * *different* field — a rare case the author can see and undo.
+ * *different* field - a rare case the author can see and undo.
  *
  * e.g. setEncodingChannel(spec, '/encoding', 'shape',
  *        {field: 'category', type: 'nominal'})
@@ -141,10 +127,7 @@ export function setEncodingChannel(
  *   "mark": {"type": "square", size: 80} → {"type": "point", "size": 80, "filled": true}
  *   "mark": "point"                     → "point"  (unchanged)
  */
-export function convertMarkToPoint(
-  spec: VegaLiteSpec,
-  markPointer: string,
-): VegaLiteSpec {
+export function convertMarkToPoint(spec: VegaLiteSpec, markPointer: string): VegaLiteSpec {
   return updateAt(spec, markPointer, (mark) => {
     // String form: 'circle' / 'square' / 'point'.
     if (typeof mark === 'string') {
@@ -172,22 +155,18 @@ export function convertMarkToPoint(
  * Set a primitive value at the given pointer. The pointer must
  * address an existing settable location (the value's parent must
  * exist). Used by recommendations that replace a single value in
- * place — e.g. bumping an inline or config fontSize number.
+ * place - e.g. bumping an inline or config fontSize number.
  *
  *   setValueAt(spec, '/encoding/x/axis/labelFontSize', 13)
  */
-export function setValueAt(
-  spec: VegaLiteSpec,
-  pointer: string,
-  value: unknown,
-): VegaLiteSpec {
+export function setValueAt(spec: VegaLiteSpec, pointer: string, value: unknown): VegaLiteSpec {
   return updateAt(spec, pointer, () => value);
 }
 
 /**
  * Set config.<section>.<property> to a value, creating the `config`
  * and section objects if they don't exist yet. Used when the fix
- * belongs at the config level rather than on a specific node — e.g.
+ * belongs at the config level rather than on a specific node - e.g.
  * a too-small Vega-Lite *default* font size, where nothing is set
  * inline and writing to config is the cleanest, most robust place.
  *
@@ -196,12 +175,7 @@ export function setValueAt(
  *
  * Existing config / section properties are preserved.
  */
-export function setConfigProperty(
-  spec: VegaLiteSpec,
-  section: string,
-  property: string,
-  value: unknown,
-): VegaLiteSpec {
+export function setConfigProperty(spec: VegaLiteSpec, section: string, property: string, value: unknown): VegaLiteSpec {
   return updateAt(spec, '/config', (config) => {
     const cfg = (config as Record<string, unknown>) ?? {};
     const sectionObj = (cfg[section] as Record<string, unknown>) ?? {};
@@ -217,15 +191,11 @@ export function setConfigProperty(
  * If the pointer doesn't resolve to a settable location, the spec
  * is returned unchanged.
  */
-function updateAt(
-  spec: VegaLiteSpec,
-  pointer: string,
-  update: (value: unknown) => unknown,
-): VegaLiteSpec {
+function updateAt(spec: VegaLiteSpec, pointer: string, update: (value: unknown) => unknown): VegaLiteSpec {
   const segments = parsePointer(pointer);
   const cloned = deepClone(spec);
 
-  // Empty pointer means "the whole spec" — replace the root.
+  // Empty pointer means "the whole spec" - replace the root.
   if (segments.length === 0) {
     return update(cloned) as VegaLiteSpec;
   }
@@ -283,7 +253,7 @@ function deepClone<T>(value: T): T {
  * readable text next to each datum (WCAG 1.4.1).
  *
  * Unlike shape / strokeDash, the `text` channel only renders on a
- * `text` mark — you cannot add it to a point/bar/line. So the fix is
+ * `text` mark - you cannot add it to a point/bar/line. So the fix is
  * structural: keep the original mark as layer 0, and add a sibling
  * `text` mark (layer 1) that shares the same x/y and writes the field.
  *
@@ -325,7 +295,7 @@ export function addTextLabelLayer(
     };
 
     // Layer 1: a text mark writing the category field. We set `color`
-    // explicitly when the caller supplied one — without it, the text
+    // explicitly when the caller supplied one - without it, the text
     // inherits Vega-Lite's default (black), which is invisible on
     // dark backgrounds. Callers that want the default can omit it.
     const textMark: Record<string, unknown> = {

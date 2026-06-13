@@ -62,7 +62,7 @@ function isAAASuggestion(issue: AccessibilityIssue): boolean {
  * NB: this mirrors `appendCitations` in the accessibility pane, but
  * adds Markdown italic markers because Monaco hovers render Markdown
  * while the pane renders plain React text. Kept as separate functions
- * because the wrapping syntax differs — sharing would require either
+ * because the wrapping syntax differs - sharing would require either
  * a "render mode" parameter or post-hoc formatting, both of which
  * obscure intent at the call sites.
  */
@@ -133,29 +133,28 @@ function toIssueDecorations(
       continue;
     }
 
-  // Decide which range to underline:
-  //   'underline-key' — the property KEY (e.g. just `"y"`). Used
-  //                     when the pointer is an anchor for a fix
-  //                     rather than the location of a value the
-  //                     author wrote, so underlining the value
-  //                     would mark unrelated siblings as wrong.
-  //   anything else   — the value at the pointer (default).
-  let rangeNode = valueNode;
-  if (issue.editorVisibility === 'underline-key') {
-    const property = valueNode.parent;
-    const keyNode =
-      property && property.type === 'property' ? property.children?.[0] : null;
-    // No honest key to mark (root pointer, malformed tree) → skip
-    // silently rather than fall back to the value, which would be
-    // exactly the misleading underline we're trying to avoid.
-    if (!keyNode) {
-      continue;
+    // Decide which range to underline:
+    //   'underline-key' - the property KEY (e.g. just `"y"`). Used
+    //                     when the pointer is an anchor for a fix
+    //                     rather than the location of a value the
+    //                     author wrote, so underlining the value
+    //                     would mark unrelated siblings as wrong.
+    //   anything else   - the value at the pointer (default).
+    let rangeNode = valueNode;
+    if (issue.editorVisibility === 'underline-key') {
+      const property = valueNode.parent;
+      const keyNode = property && property.type === 'property' ? property.children?.[0] : null;
+      // No honest key to mark (root pointer, malformed tree) → skip
+      // silently rather than fall back to the value, which would be
+      // exactly the misleading underline we're trying to avoid.
+      if (!keyNode) {
+        continue;
+      }
+      rangeNode = keyNode;
     }
-    rangeNode = keyNode;
-  }
 
-  const start = model.getPositionAt(rangeNode.offset);
-  const end = model.getPositionAt(rangeNode.offset + rangeNode.length);
+    const start = model.getPositionAt(rangeNode.offset);
+    const end = model.getPositionAt(rangeNode.offset + rangeNode.length);
 
     // AAA issues are framed as suggestions, not problems
     const isAAA = isAAASuggestion(issue);
@@ -233,11 +232,11 @@ function toIssueMarkers(
     // They still surface in the problems panel (via toIssueMarkers)
     // and in the Accessibility tab. Used when an issue's pointer is
     // an anchor for the fix rather than the location of the actual
-    // value being criticised — e.g. fontSizeRule defaults.
+    // value being criticised - e.g. fontSizeRule defaults.
 
-  if (issue.editorVisibility === 'marker-only') {
-    continue;
-  }
+    if (issue.editorVisibility === 'marker-only') {
+      continue;
+    }
     const path = jsonPointerToPath(issue.jsonPointer);
     const node = findNodeAtLocation(tree, path);
     if (!node) {

@@ -9,7 +9,7 @@
  *   colorRiskRule fires on color FAMILIES detected in the spec
  *   (e.g. "this scale contains a red and a green color"), regardless
  *   of how the colors were specified. Its issues do NOT carry a
- *   `scaleType` field — the rule looks across many spec locations
+ *   `scaleType` field - the rule looks across many spec locations
  *   (mark colors, encoding values, scale ranges, config ranges), so
  *   the "scale type" concept doesn't always apply.
  *
@@ -54,7 +54,7 @@ type RiskContext =
  *
  * Strategy:
  *   1. Walk the issue's pointer looking for `…/encoding/<channel>/scale`
- *      ANYWHERE in the path — works for top-level specs (e.g.
+ *      ANYWHERE in the path - works for top-level specs (e.g.
  *      `/encoding/color/scale/range/0`) as well as wrapped ones:
  *      `/layer/0/encoding/…`, `/concat/2/encoding/…`,
  *      `/hconcat/1/encoding/…`, `/vconcat/0/encoding/…`,
@@ -68,15 +68,12 @@ type RiskContext =
  *
  * Implementation note: we walk into the spec one segment at a time
  * rather than hardcoding the wrappers we recognise. That way new
- * container shapes (or schema additions) work automatically — the
+ * container shapes (or schema additions) work automatically - the
  * only thing this function needs to recognise is the `encoding`
  * /<channel>/`scale` triple, which is the same regardless of how
  * deeply it's nested.
  */
-function inferRiskContext(
-  issue: AccessibilityIssue,
-  spec: VegaLiteSpec,
-): RiskContext {
+function inferRiskContext(issue: AccessibilityIssue, spec: VegaLiteSpec): RiskContext {
   const pointer = issue.jsonPointer;
   if (!pointer) return {kind: 'unknown'};
 
@@ -84,7 +81,7 @@ function inferRiskContext(
 
   // Find the LAST occurrence of `encoding` followed by `<channel>/scale`.
   // Last wins for the (rare) case of an inner spec inheriting from
-  // an outer one — we want the deepest channel that actually owns
+  // an outer one - we want the deepest channel that actually owns
   // the failing colour.
   let encIdx = -1;
   for (let i = segments.length - 3; i >= 0; i--) {
@@ -172,11 +169,10 @@ function buildRiskSwap(args: {
     apply(issue, spec) {
       // Use the inferred scale pointer rather than parentPointer
       // because the issue pointer often addresses one element of a
-      // range array — its parent is the range array, not the scale
+      // range array - its parent is the range array, not the scale
       // object setScheme needs.
       const ctx = inferRiskContext(issue, spec);
-      const scalePointer =
-        ctx.kind === 'unknown' ? parentPointer(issue.jsonPointer) : ctx.scalePointer;
+      const scalePointer = ctx.kind === 'unknown' ? parentPointer(issue.jsonPointer) : ctx.scalePointer;
       return setScheme(spec, scalePointer, args.schemeName);
     },
   };
@@ -205,7 +201,6 @@ export const riskSwapToSet2 = buildRiskSwap({
   appliesToContext: (ctx) => ctx.kind === 'categorical-range',
 });
 
-
 export const riskSwapToObservable10 = buildRiskSwap({
   id: 'risk-swap-to-observable10',
   label: 'Switch to observable10',
@@ -223,7 +218,7 @@ export const riskSwapToViridis = buildRiskSwap({
   label: 'Switch to viridis',
   description:
     'Perceptually uniform sequential palette, CVD-safe. Strong neutral ' +
-    'default — replaces the explicit colors with a continuous palette ' +
+    'default - replaces the explicit colors with a continuous palette ' +
     'that has no problematic family pairings.',
   schemeName: 'viridis',
   appliesToContext: (ctx) => ctx.kind === 'sequential-range',
@@ -232,9 +227,7 @@ export const riskSwapToViridis = buildRiskSwap({
 export const riskSwapToCividis = buildRiskSwap({
   id: 'risk-swap-to-cividis',
   label: 'Switch to cividis',
-  description:
-    'Sequential palette designed so CVD and non-CVD viewers see ' +
-    'nearly the same scale.',
+  description: 'Sequential palette designed so CVD and non-CVD viewers see ' + 'nearly the same scale.',
   schemeName: 'cividis',
   appliesToContext: (ctx) => ctx.kind === 'sequential-range',
 });
@@ -256,8 +249,7 @@ export const riskSwapToBlueOrange = buildRiskSwap({
 export const riskSwapToRedBlue = buildRiskSwap({
   id: 'risk-swap-to-redblue',
   label: 'Switch to redblue',
-  description:
-    'Classic diverging palette (red-white-blue). Reasonably CVD-safe.',
+  description: 'Classic diverging palette (red-white-blue). Reasonably CVD-safe.',
   schemeName: 'redblue',
   appliesToContext: (ctx) => ctx.kind === 'diverging-range',
 });

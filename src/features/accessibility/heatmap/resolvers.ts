@@ -13,7 +13,7 @@
  *
  * One resolver per rule family, registered below. The registry maps a
  * ruleId to its resolver exactly like the recommendation registry
- * does — including the same hierarchical prefix match, because rules
+ * does - including the same hierarchical prefix match, because rules
  * emit sub-category ids (e.g. fontSizeRule's id is 'vl-a11y-font-size'
  * but its issues are 'vl-a11y-font-size:axis.labelFontSize').
  *
@@ -45,7 +45,7 @@ export interface ResolverContext {
 /**
  * Kind of region: 'mark' for data marks and legend symbols (visual
  * marks); 'text' for axis/legend/title labels and titles. Drives
- * clustering — marks inflate before the overlap test so dense
+ * clustering - marks inflate before the overlap test so dense
  * scatters merge into regional blobs; text stays tight so labels
  * and titles never bleed into one another.
  */
@@ -87,7 +87,7 @@ export interface IssueRegion {
 const RESOLVER_REGISTRY: Record<string, IssueResolver> = {
   'vl-a11y-font-size': fontSizeResolver,
 
-  // Colour-scale rules — all manifest on the coloured marks + legend.
+  // Colour-scale rules - all manifest on the coloured marks + legend.
   'vl-a11y-colorblind-safety': colorScaleResolver,
   // colourRiskRule's rule.id and its issue-id prefix differ, so register
   // both forms (same divergence the recommendation registry handles).

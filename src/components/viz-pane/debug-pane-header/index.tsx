@@ -79,7 +79,7 @@ const DebugPaneHeader: React.FC = () => {
   );
 
   // The Accessibility tab shows a `(N)` counter with the total issue
-  // count. We deliberately do NOT auto-open the debug pane on issues —
+  // count. We deliberately do NOT auto-open the debug pane on issues -
   // unlike errors, most charts have at least one issue (e.g. default
   // font-size info), which would be too aggressive a UX.
   const accessibilityCount = accessibilityIssues?.length ?? 0;

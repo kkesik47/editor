@@ -2,7 +2,7 @@
  * perceptualUniformityAnalysis.ts
  *
  * Measures whether an ordered color scale has perceptually uniform
- * steps — i.e., equal data intervals produce equal perceived color
+ * steps - i.e., equal data intervals produce equal perceived color
  * changes.
  *
  * The classic failure case is the rainbow colormap, where some
@@ -12,7 +12,7 @@
  *
  * Method (sequential scales):
  *   1. Sample the scale at evenly-spaced intervals (already done
- *      by resolveScaleColors — typically 16 samples).
+ *      by resolveScaleColors - typically 16 samples).
  *   2. Compute CIEDE2000 ΔE between each consecutive pair.
  *      This gives N-1 "step sizes" that capture perceived
  *      color change in hue, chroma, and lightness together.
@@ -28,7 +28,7 @@
  *
  * Method (diverging scales):
  *   A correctly designed diverging palette has a low-chroma
- *   midpoint — so consecutive steps near the centre are small
+ *   midpoint - so consecutive steps near the centre are small
  *   while steps near the endpoints are large. Measured across
  *   the full sequence, that V-shape always produces a high
  *   max/min ratio and CV. So we split the samples at the
@@ -83,7 +83,7 @@ export const MAX_MIN_RATIO_THRESHOLD = 4;
  *      sequential case.
  *
  *   2. Well-designed diverging palettes like ColorBrewer RdBu have
- *      step ratios around 4× per half by construction — they're
+ *      step ratios around 4× per half by construction - they're
  *      perceptually uniform in CIELAB L*, but ΔE folds in chroma
  *      changes too, and on a half you have saturated→desaturated
  *      transitions that produce large ΔE next to near-white pure
@@ -221,8 +221,7 @@ function statsFromSteps(steps: PerceptualStep[]): HalfUniformity {
   const deltaEs = steps.map((s) => s.deltaE);
   const mean = round2(deltaEs.reduce((sum, d) => sum + d, 0) / deltaEs.length);
 
-  const variance =
-    deltaEs.reduce((sum, d) => sum + (d - mean) ** 2, 0) / deltaEs.length;
+  const variance = deltaEs.reduce((sum, d) => sum + (d - mean) ** 2, 0) / deltaEs.length;
   const stdDev = round2(Math.sqrt(variance));
 
   const cv = mean > 0 ? round2(stdDev / mean) : 0;
@@ -243,11 +242,7 @@ function statsFromSteps(steps: PerceptualStep[]): HalfUniformity {
  * `slice` begins (inclusive). `parsedSlice` holds pre-parsed culori
  * colors aligned with `slice`, with undefined for unparseable values.
  */
-function stepsForSlice(
-  slice: string[],
-  parsedSlice: (ReturnType<typeof parse>)[],
-  startIndex: number,
-): PerceptualStep[] {
+function stepsForSlice(slice: string[], parsedSlice: ReturnType<typeof parse>[], startIndex: number): PerceptualStep[] {
   const steps: PerceptualStep[] = [];
 
   for (let i = 0; i < slice.length - 1; i++) {
@@ -280,9 +275,7 @@ function stepsForSlice(
  * @param colors - Array of CSS color strings (sequential order).
  * @returns Analysis result with step values and evenness metrics.
  */
-export function analyzePerceptualUniformity(
-  colors: string[],
-): UniformityAnalysisResult {
+export function analyzePerceptualUniformity(colors: string[]): UniformityAnalysisResult {
   if (colors.length < MIN_COLORS_FOR_ANALYSIS) {
     return {...emptyHalf(), hasSufficientColors: false};
   }
@@ -313,9 +306,7 @@ export function analyzePerceptualUniformity(
  *
  * @param colors - Array of CSS color strings (diverging order).
  */
-export function analyzeDivergingUniformity(
-  colors: string[],
-): DivergingUniformityAnalysisResult {
+export function analyzeDivergingUniformity(colors: string[]): DivergingUniformityAnalysisResult {
   const n = colors.length;
   const midIndex = Math.floor(n / 2);
 
@@ -336,8 +327,7 @@ export function analyzeDivergingUniformity(
   // Reliable per-half stats need enough samples on each side AND
   // at least 2 steps per half (so variance is meaningful).
   const enoughSamples =
-    leftSlice.length >= MIN_COLORS_FOR_HALF_ANALYSIS &&
-    rightSlice.length >= MIN_COLORS_FOR_HALF_ANALYSIS;
+    leftSlice.length >= MIN_COLORS_FOR_HALF_ANALYSIS && rightSlice.length >= MIN_COLORS_FOR_HALF_ANALYSIS;
   const enoughSteps = leftSteps.length >= 2 && rightSteps.length >= 2;
 
   return {
