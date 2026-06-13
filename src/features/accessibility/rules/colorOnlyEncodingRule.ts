@@ -55,7 +55,7 @@ const REDUNDANT_CHANNELS = [
   'y',
   // NOTE: xOffset / yOffset are deliberately NOT here. They separate
   // marks spatially but render no labelled axis, so the only key to
-  // which category is which remains the colour legend - i.e. colour is
+  // which category is which remains the color legend - i.e. color is
   // still the sole *identifying* encoding (WCAG 1.4.1). By contrast
   // x / y / row / column / facet all render labelled ticks or headers,
   // which is why they DO count as redundant.
@@ -186,7 +186,7 @@ function buildSuggestion(markType: string | null, channel: string): string {
 
 /**
  * The channel-def-shaped object that actually carries field/type for
- * this colour encoding. Vega-Lite allows the categorical field and
+ * this color encoding. Vega-Lite allows the categorical field and
  * type to live inside a `condition` block - the `color.condition`
  * branch is exactly where things like the brush/click pattern put
  * them - while `color` itself only carries the fallback `value`.
@@ -327,7 +327,7 @@ function buildIssue(match: ColorOnlyMatch): AccessibilityIssue {
  *
  * Only non-positional channels: a sibling text / shape / strokeDash
  * layer carrying the same field (and sitting at the same x/y) lets a
- * colour-blind reader tell categories apart. This is what recognises
+ * color-blind reader tell categories apart. This is what recognises
  * the "add a text-label layer" fix - the category becomes readable
  * text in a sibling layer rather than a channel on the original mark.
  */

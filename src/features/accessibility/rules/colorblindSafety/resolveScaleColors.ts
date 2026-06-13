@@ -5,13 +5,13 @@
  * EXPLICIT (where the author has set encoding.<channel>.scale) and
  * IMPLICIT (where no scale is written and Vega-Lite falls back to a
  * default scheme based on field type and mark type). For each
- * scale, resolves a concrete array of CSS colour strings.
+ * scale, resolves a concrete array of CSS color strings.
  *
  * Handles four specification forms:
  *   1. scale.range  - a literal array of color strings
  *   2. scale.scheme - a string naming a Vega/D3 color scheme
  *   3. scale.scheme - an object { name, count?, extent? }
- *   4. No explicit colours - synthesise the Vega-Lite default
+ *   4. No explicit colors - synthesise the Vega-Lite default
  *      (e.g. nominal → tableau10, quant+rect → viridis); authors
  *      can override these via config.range.*
  * Continuous/sequential schemes are sampled at evenly-spaced points.
@@ -295,7 +295,7 @@ function resolveCategoryCount(spec: Record<string, unknown>, channelDef: Record<
 // ─── Implicit-default scheme synthesis ───────────────────────────
 
 /**
- * Vega-Lite's default colour schemes, keyed by the `config.range.*`
+ * Vega-Lite's default color schemes, keyed by the `config.range.*`
  * sub-property that selects them. Authors who omit `scale.scheme` and
  * `scale.range` get these palettes:
  *
@@ -344,7 +344,7 @@ function pickRangeKey(
 
 /**
  * Resolve the implicit default scheme name for a channel with no
- * explicit colours. Honours `config.range.<key>` overrides before
+ * explicit colors. Honours `config.range.<key>` overrides before
  * falling back to the hardcoded Vega-Lite mapping.
  */
 function synthesizeImplicitScheme(
@@ -611,9 +611,9 @@ function extractFromChannelDef(
     return;
   }
 
-  // ── Case 4: no explicit colours - synthesise Vega-Lite's default ──
+  // ── Case 4: no explicit colors - synthesise Vega-Lite's default ──
   //
-  // Without this branch the rule would skip every chart whose colour
+  // Without this branch the rule would skip every chart whose color
   // channel relies on the implicit default scheme - the most common
   // case in the wild. The default is looked up from `config.range.<key>`
   // when the author has overridden it, otherwise from the hardcoded

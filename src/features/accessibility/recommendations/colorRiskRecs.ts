@@ -82,7 +82,7 @@ function inferRiskContext(issue: AccessibilityIssue, spec: VegaLiteSpec): RiskCo
   // Find the LAST occurrence of `encoding` followed by `<channel>/scale`.
   // Last wins for the (rare) case of an inner spec inheriting from
   // an outer one - we want the deepest channel that actually owns
-  // the failing colour.
+  // the failing color.
   let encIdx = -1;
   for (let i = segments.length - 3; i >= 0; i--) {
     if (segments[i] === 'encoding' && segments[i + 2] === 'scale') {

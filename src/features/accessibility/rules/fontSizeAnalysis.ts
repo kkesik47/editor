@@ -19,7 +19,7 @@
  *   The spec is walked as a tree, so font-bearing elements are found
  *   inside layer / concat / facet compositions, not just at the top
  *   level. (Without this, wrapping a chart in a `layer` - e.g. when the
- *   colour-only fix adds a text-label layer - would hide every font
+ *   color-only fix adds a text-label layer - would hide every font
  *   element from this rule.) Config is global, so it is always resolved
  *   from the ROOT spec; inline values come from the local view node.
  *
@@ -283,7 +283,7 @@ function checkChartTitle(
  *
  * Only x and y: xOffset / yOffset position marks within a band but
  * render no labelled axis of their own, so they have no axis font to
- * check. (For colour-only detection they're treated separately - see
+ * check. (For color-only detection they're treated separately - see
  * colorOnlyEncodingRule.)
  */
 const AXIS_CHANNELS = ['x', 'y'];

@@ -319,7 +319,7 @@ export const swapToDark2 = buildSchemeSwap({
   description:
     'Higher-saturation ColorBrewer categorical palette. Stays CVD-safe ' +
     'up to about six categories. Best when the original design was ' +
-    'vibrant and you want to keep strong colour separation.',
+    'vibrant and you want to keep strong color separation.',
   schemeName: 'dark2',
   applies: (evidence) => evidence.scaleType === 'categorical' && isUnderSafeLimit('dark2', evidence.usedCategoryCount),
 });
@@ -329,7 +329,7 @@ export const swapToObservable10 = buildSchemeSwap({
   label: 'Switch to observable10',
   description:
     "Observable's default categorical palette. Stays CVD-safe up to " +
-    'about five categories; deuteranopia collapses two colours at six. ' +
+    'about five categories; deuteranopia collapses two colors at six. ' +
     'Modern, well-balanced between vibrancy and discriminability.',
   schemeName: 'observable10',
   applies: (evidence) =>
@@ -340,7 +340,7 @@ export const swapToOkabeIto = buildRangeSwap({
   id: 'cvd-swap-to-okabe-ito',
   label: 'Switch to Okabe-Ito',
   description:
-    'Hand-picked 8-colour palette designed specifically for color ' +
+    'Hand-picked 8-color palette designed specifically for color ' +
     'vision deficiency (Okabe & Ito, 2008). The de-facto standard for ' +
     'CVD-safe categorical visualization in scientific publications.',
   palette: OKABE_ITO,
@@ -351,7 +351,7 @@ export const swapToWong = buildRangeSwap({
   id: 'cvd-swap-to-wong',
   label: 'Switch to Wong palette',
   description:
-    'Hand-picked 7-colour palette from Nature Methods (Wong, 2011). ' +
+    'Hand-picked 7-color palette from Nature Methods (Wong, 2011). ' +
     'Slightly more muted than Okabe-Ito with the same CVD-safety ' +
     'guarantees. Good for academic / publication-style figures.',
   palette: WONG,

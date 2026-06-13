@@ -3,9 +3,9 @@
  *
  * Recommendations for issues from `perceptualUniformityRule`.
  *
- * The rule fires when an ordered (sequential / diverging) colour scale
+ * The rule fires when an ordered (sequential / diverging) color scale
  * has uneven perceptual steps - equal data intervals producing unequal
- * visible colour changes (the classic rainbow problem). The
+ * visible color changes (the classic rainbow problem). The
  * machine-applicable fix is to swap the scale for a perceptually
  * uniform scheme, via `setScheme` (which drops any explicit `range`).
  * Same shape as the scale-swap recs in colorblindSafetyRecs /
@@ -50,7 +50,7 @@
  * "preserve hue feel" rec for arbitrary input would need separate work.
  *
  * Re-spacing a custom `range` in place (an adjustment-family fix that
- * keeps the author's own colours but resamples them to equal ΔE steps)
+ * keeps the author's own colors but resamples them to equal ΔE steps)
  * is still left for a later pass.
  */
 
@@ -103,13 +103,13 @@ const SEQUENTIAL_CANDIDATES: Candidate[] = [
     description:
       'Perceptually uniform: equal data steps produce equal visual ' +
       'changes. Strong neutral default - grayscale-readable and ' +
-      'colourblind-safe.',
+      'colorblind-safe.',
   },
   {
     name: 'cividis',
     type: 'sequential',
     description:
-      'Perceptually uniform, designed so colourblind and ' + 'non-colourblind viewers see nearly the same scale.',
+      'Perceptually uniform, designed so colorblind and ' + 'non-colorblind viewers see nearly the same scale.',
   },
   {
     name: 'magma',
@@ -119,7 +119,7 @@ const SEQUENTIAL_CANDIDATES: Candidate[] = [
   {
     name: 'greys',
     type: 'sequential',
-    description: 'Neutral grayscale. The most robust option for print and for ' + 'any colour vision deficiency.',
+    description: 'Neutral grayscale. The most robust option for print and for ' + 'any color vision deficiency.',
   },
 ];
 
@@ -128,8 +128,8 @@ const DIVERGING_CANDIDATES: Candidate[] = [
     name: 'blueorange',
     type: 'diverging',
     description:
-      'Even colour steps on each side of the midpoint; the blue–orange ' +
-      'axis also stays distinct for most colourblind viewers.',
+      'Even color steps on each side of the midpoint; the blue–orange ' +
+      'axis also stays distinct for most colorblind viewers.',
   },
   {
     name: 'redblue',
@@ -139,12 +139,12 @@ const DIVERGING_CANDIDATES: Candidate[] = [
   {
     name: 'purpleorange',
     type: 'diverging',
-    description: 'Purple–orange axis with even steps per half and good ' + 'colourblind safety.',
+    description: 'Purple–orange axis with even steps per half and good ' + 'colorblind safety.',
   },
   {
     name: 'brownbluegreen',
     type: 'diverging',
-    description: 'Brown ↔ blue-green diverging palette, even per half and ' + 'colourblind-friendly.',
+    description: 'Brown ↔ blue-green diverging palette, even per half and ' + 'colorblind-friendly.',
   },
   {
     name: 'purplegreen',

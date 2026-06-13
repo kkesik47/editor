@@ -93,14 +93,14 @@ function isGradientScaleType(scaleType: unknown): boolean {
 /**
  * Width of the row-label column in the two-row CVD/grayscale preview.
  *
- * Kept fixed (not computed from the longest label) so the colour bars
+ * Kept fixed (not computed from the longest label) so the color bars
  * start at the same x across every CVD/grayscale preview in the pane,
  * letting the eye scan a column of previews without horizontal jitter.
  * Sized to fit the longest expected label ("Deuteranopia") at 12 px.
  */
 const TWO_ROW_LABEL_W = 90;
 
-/** Max total width for the colour bar / swatch row, to prevent overflow. */
+/** Max total width for the color bar / swatch row, to prevent overflow. */
 const TWO_ROW_MAX_BAR_W = 280;
 
 /**
@@ -126,7 +126,7 @@ function buildTwoRowColorPreview(
   const paddingY = SPACE + 2; // 6
 
   // For categorical scales: pick a swatch width that keeps the row
-  // under TWO_ROW_MAX_BAR_W even with many colours. Minimum width 12
+  // under TWO_ROW_MAX_BAR_W even with many colors. Minimum width 12
   // (below that swatches stop being readable as distinct cells).
   let barW: number;
   let swatchW = 0;

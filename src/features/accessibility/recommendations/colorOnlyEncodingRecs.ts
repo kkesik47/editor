@@ -19,7 +19,7 @@
  *   - column      → works for ANY mark (categories separated by
  *                   position instead of color), at the cost of layout
  *                   space; this is the catch-all so that e.g. a bar
- *                   chart coloured by category still gets a usable fix.
+ *                   chart colored by category still gets a usable fix.
  *
  * Following the engine's principle: we surface every applicable
  * option side-by-side and let the author pick the trade-off, rather
@@ -164,7 +164,7 @@ function buildAddChannel(args: {
 /**
  * Walk to one channel's definition in the spec.
  *
- * Used to inspect the SOURCE colour encoding so the redundant
+ * Used to inspect the SOURCE color encoding so the redundant
  * channel we add can mirror its structure (see
  * `buildRedundantChannelDef`).
  */
@@ -181,24 +181,24 @@ function readChannelDef(spec: unknown, encodingPointer: string, channel: string)
 
 /**
  * Build the channel-def for the new redundant channel
- * (shape / strokeDash), shaped to match how the SOURCE colour
+ * (shape / strokeDash), shaped to match how the SOURCE color
  * encoding references its field.
  *
  * Why this matters: Vega-Lite merges legends across encodings that
  * share the same (field, type). It tracks an encoding's field by
  * looking BOTH at the channel level and inside `condition` - but
  * legend merging keys off structural depth. A `{condition.field}`
- * colour encoding paired with a `{field}` shape encoding doesn't
+ * color encoding paired with a `{field}` shape encoding doesn't
  * merge, so a "redundancy" fix ends up producing TWO legends for
  * one categorical field instead of one combined legend.
  *
  * Mirror solution:
- *   - colour has field at channel level    → shape gets {field, type}
- *   - colour has field inside a condition  → shape mirrors the
+ *   - color has field at channel level    → shape gets {field, type}
+ *   - color has field inside a condition  → shape mirrors the
  *     condition shape: same predicate (param/test/not/empty), same
  *     field/type, and scale.domain copied across to keep category
  *     order consistent (range is intentionally dropped - shape /
- *     strokeDash don't use a colour range).
+ *     strokeDash don't use a color range).
  */
 function buildRedundantChannelDef(
   spec: VegaLiteSpec,
@@ -236,7 +236,7 @@ function buildRedundantChannelDef(
 
     // Carry over scale.domain so categories sort the same way on
     // both legends - required for a clean merge. Skip scale.range:
-    // shape / strokeDash don't render a colour range.
+    // shape / strokeDash don't render a color range.
     if (condObj.scale && typeof condObj.scale === 'object' && !Array.isArray(condObj.scale)) {
       const sourceScale = condObj.scale as Record<string, any>;
       if (sourceScale.domain) {
@@ -353,7 +353,7 @@ export const addTextLabels: Recommendation = {
     // encoding pointer:  /encoding → ''(root) ,  /layer/0/encoding → /layer/0
     const unitPointer = parentPointer(encodingPointerFor(issue));
 
-    // Pick a text colour that contrasts with whatever background the
+    // Pick a text color that contrasts with whatever background the
     // chart actually has. Without this the text mark inherits Vega-
     // Lite's default (black), which is invisible on a dark background
     // - exactly the surprise we want to avoid for an accessibility

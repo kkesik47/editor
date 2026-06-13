@@ -20,7 +20,7 @@
  * Categorical scales are deliberately excluded: qualitative palettes
  * trade lightness uniformity for hue diversity by design (Brewer
  * 2003; Wong 2011), so a ΔL* test would flag every well-designed
- * qualitative palette. The colour-only-encoding rule (WCAG 1.4.1)
+ * qualitative palette. The color-only-encoding rule (WCAG 1.4.1)
  * is the right place to surface greyscale-legibility concerns for
  * categorical data.
  *

@@ -213,7 +213,7 @@ export interface ContrastAnalysisResult {
  * the background. We check inline `mark.stroke` and
  * `encoding.stroke.value` - data-driven strokes
  * (`encoding.stroke.field`) are skipped because we cannot statically
- * guarantee the resolved colour.
+ * guarantee the resolved color.
  *
  * Returns true when at least one stroke source clears the non-text
  * AA threshold - i.e. the mark has a perceivable boundary against the
@@ -655,7 +655,7 @@ function checkScaleContrast(spec: Record<string, any>, bg: string): ScaleContras
  * text and mark halves of the contrast analysis behave the same way.
  *
  * Without this walk, wrapping a chart in a `layer` - e.g. when the
- * colour-only fix adds a text-label layer - hides every text element
+ * color-only fix adds a text-label layer - hides every text element
  * from this rule. The same argument is made by fontSizeAnalysis (see
  * its file header).
  *
@@ -665,7 +665,7 @@ function checkScaleContrast(spec: Record<string, any>, bg: string): ScaleContras
  * Known limitation: sibling layers SHARE one axis/legend in Vega-Lite,
  * but this walker doesn't de-duplicate them. If a future spec has
  * multiple sibling layers all inheriting the same default/config text
- * colour, the same rendered axis will be flagged once per layer. The
+ * color, the same rendered axis will be flagged once per layer. The
  * coordSystemOf + dedupeByElement pattern in fontSizeAnalysis is the
  * fix to lift here if that case shows up.
  */
@@ -723,15 +723,15 @@ function collectTextEntries(
 export function analyzeContrast(spec: Record<string, any>): ContrastAnalysisResult {
   const bg = resolveBackground(spec);
 
-  // Text colours (walks compositions, matches collectMarkColors)
+  // Text colors (walks compositions, matches collectMarkColors)
   const textEntries: TextContrastEntry[] = [];
   collectTextEntries(spec, spec, '', bg.color, textEntries);
 
-  // Mark colours (walks compositions)
+  // Mark colors (walks compositions)
   const markEntries: MarkContrastEntry[] = [];
   collectMarkColors(spec, '', bg.color, markEntries);
 
-  // Scale colours (categorical only)
+  // Scale colors (categorical only)
   const scaleResults = checkScaleContrast(spec, bg.color);
 
   return {

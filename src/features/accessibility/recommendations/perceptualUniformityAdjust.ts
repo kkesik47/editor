@@ -1,12 +1,12 @@
 /**
  * recommendations/perceptualUniformityAdjust.ts
  *
- * Finds Vega-registered colour schemes whose step profile clears
+ * Finds Vega-registered color schemes whose step profile clears
  * `perceptualUniformityRule` for a given scale shape.
  *
  * Same pattern as `contrastAdjust.findContrastSafeSchemes` and
  * `lightnessAdjust.findLightnessSafeSchemes`: we walk SCHEME_CATALOG,
- * resolve each candidate to colours at the same 16-sample density the
+ * resolve each candidate to colors at the same 16-sample density the
  * rule uses, and run it through the RULE'S OWN ANALYSIS FUNCTIONS
  * (`analyzePerceptualUniformity` / `analyzeDivergingUniformity`). A
  * scheme only survives if that analysis would classify it as "ok" -
@@ -50,7 +50,7 @@ export type OrderedScaleType = 'sequential' | 'diverging';
 /**
  * How many evenly-spaced samples to take from a continuous scheme.
  * Matches the rule's own sampling density (resolveScaleColors uses
- * 16), so each candidate is judged on the same colours a chart using
+ * 16), so each candidate is judged on the same colors a chart using
  * it would actually render.
  */
 const CONTINUOUS_SAMPLE_COUNT = 16;
@@ -63,7 +63,7 @@ const CONTINUOUS_SAMPLE_COUNT = 16;
 // lightnessAdjust / contrastAdjust.
 
 /**
- * Resolve a Vega scheme name to an array of colours, sampled the same
+ * Resolve a Vega scheme name to an array of colors, sampled the same
  * way the rule samples continuous scales.
  *
  * Returns null for unknown schemes or anything that isn't a continuous

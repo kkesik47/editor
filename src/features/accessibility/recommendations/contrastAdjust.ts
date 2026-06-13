@@ -8,12 +8,12 @@
  * spec edits):
  *
  *   1. adjustForegroundUntilRatio
- *      Given a foreground and background, return a foreground colour
+ *      Given a foreground and background, return a foreground color
  *      adjusted just enough to clear a target contrast ratio. Used
  *      by "Darken/lighten foreground" and "Darken/lighten the mark".
  *
  *   2. pickSafeBackgroundFor
- *      Given a set of failing foreground colours, return the
+ *      Given a set of failing foreground colors, return the
  *      background extreme (white or near-black) that maximises the
  *      MINIMUM contrast ratio across them. Used by "Change
  *      background". This is the corrected picker - earlier versions
@@ -23,7 +23,7 @@
  *   3. findContrastSafeSchemes
  *      Walk the scheme catalog, resolve each scheme at an appropriate
  *      sample density, and return the schemes where every sampled
- *      colour clears a target ratio against the given background.
+ *      color clears a target ratio against the given background.
  *      Used by the palette-swap recommendation for scale failures.
  *
  * All three reuse `computeContrastRatio` from `contrastAnalysis.ts`,
@@ -38,7 +38,7 @@ import {SCHEME_CATALOG, type SchemeType, type SchemeEntry} from './schemeCatalog
 // ─── Background snap targets ─────────────────────────────────────
 //
 // "Change background" snaps to a safe extreme rather than computing a
-// minimal nudge: a global colour change is more likely to introduce
+// minimal nudge: a global color change is more likely to introduce
 // new failures elsewhere than fix them, so half-measures are
 // dangerous. Pure white and a deep near-black are the defensible
 // extremes; one of them will help any failing foreground.
@@ -159,14 +159,14 @@ export function adjustForegroundUntilRatio(foreground: string, background: strin
  * background would snap to near-black, lowering contrast further.
  *
  * The right question is "where do the failing foregrounds sit?", not
- * "what theme is the chart in?". Near-black failing colours need a
+ * "what theme is the chart in?". Near-black failing colors need a
  * LIGHT extreme, regardless of where the current background is.
  *
  * Strategy: try both extremes, pick whichever gives the higher worst-
  * case ratio against the failing set. Ties go to white (the more
  * common default).
  *
- * Returns null only when none of the failing colours parse - at
+ * Returns null only when none of the failing colors parse - at
  * which point we have nothing sensible to optimise against.
  */
 export function pickSafeBackgroundFor(failingForegrounds: string[]): string | null {
@@ -190,7 +190,7 @@ export function pickSafeBackgroundFor(failingForegrounds: string[]): string | nu
 }
 
 /**
- * Pick the pure text colour (black or white) that contrasts best with
+ * Pick the pure text color (black or white) that contrasts best with
  * the given background. Direct and obvious: compare black-on-bg vs
  * white-on-bg and take the winner.
  *
@@ -254,7 +254,7 @@ function resolveSchemeColors(schemeName: string, scaleType: SchemeType, category
   return null;
 }
 
-/** Whether every colour in `colors` clears `targetRatio` against `bg`. */
+/** Whether every color in `colors` clears `targetRatio` against `bg`. */
 function allColorsClearRatio(colors: string[], bg: string, targetRatio: number): boolean {
   for (const c of colors) {
     const ratio = computeContrastRatio(c, bg);

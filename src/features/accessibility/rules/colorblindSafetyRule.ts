@@ -22,7 +22,7 @@
  *   - SVG / rendered pixel analysis (spec-level only)
  *
  * What this rule DOES check:
- *   - Explicit colour scales (scale.range / scale.scheme)
+ *   - Explicit color scales (scale.range / scale.scheme)
  *   - Implicit default schemes that Vega-Lite picks when no scale
  *     is written, including config.range.* overrides
  */

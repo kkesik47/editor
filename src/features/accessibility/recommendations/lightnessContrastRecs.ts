@@ -46,7 +46,7 @@ import {findLightnessSafeSchemes} from './lightnessAdjust.js';
 interface LightnessEvidence {
   scaleType: 'sequential' | 'diverging';
   schemeName: string | null;
-  /** The sampled gradient colours threaded through by the rule. */
+  /** The sampled gradient colors threaded through by the rule. */
   originalColors: string[];
 }
 
@@ -200,7 +200,7 @@ const CANDIDATES: {name: string; type: 'sequential' | 'diverging'; description: 
     type: 'diverging',
     description:
       'Diverging palette on the purple-green axis. Decent CVD safety; ' +
-      'useful when colour-coding requires distinguishing from the more ' +
+      'useful when color-coding requires distinguishing from the more ' +
       'common red-blue conventions.',
   },
   {

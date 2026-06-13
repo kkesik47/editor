@@ -13,7 +13,7 @@
  *
  *   vl-a11y-contrast:text-aa     text fails 4.5:1 (warning, or info if default)
  *   vl-a11y-contrast:text-aaa    text passes AA but misses 7:1 (info)
- *   vl-a11y-contrast:non-text-aa mark OR scale colour fails 3:1 (warning)
+ *   vl-a11y-contrast:non-text-aa mark OR scale color fails 3:1 (warning)
  *
  * The non-text-aa issue comes in two flavours, distinguished by the
  * shape of evidence:
@@ -34,7 +34,7 @@
  *
  *   Sequential / diverging scale contrast: the rule deliberately
  *   skips these (see checkScaleContrast in contrastAnalysis.ts) on
- *   the grounds that gradient colours don't stand alone. So this
+ *   the grounds that gradient colors don't stand alone. So this
  *   file's palette-swap rec only offers CATEGORICAL alternatives;
  *   sequential/diverging candidates were removed in v2 since they
  *   were unreachable. If/when the rule's scope expands to gradients,
@@ -59,7 +59,7 @@ interface ContrastEvidence {
   wcagLevel: 'AA' | 'AAA';
   /** 'text' for text issues, 'non-text' for mark/scale issues. */
   elementType: 'text' | 'non-text';
-  /** Resolved foreground colour (single-mark and text issues only). */
+  /** Resolved foreground color (single-mark and text issues only). */
   foregroundColor: string | null;
   backgroundColor: string;
   contrastRatio: number | null;
@@ -69,7 +69,7 @@ interface ContrastEvidence {
   /** Element label, e.g. "X-axis labels" - used in some descriptions. */
   elementLabel: string | null;
   /**
-   * For scale-flavour non-text issues: the list of colours in the
+   * For scale-flavour non-text issues: the list of colors in the
    * scale. Length > 1 means "scale flavour"; length === 1 means
    * single-mark flavour. Absent for text issues.
    */
@@ -82,8 +82,8 @@ interface ContrastEvidence {
    */
   failingColors: string[] | null;
   /**
-   * Same failing colours as `failingColors`, paired with their index
-   * in the scale's colour list so a per-colour fix can edit the right
+   * Same failing colors as `failingColors`, paired with their index
+   * in the scale's color list so a per-color fix can edit the right
    * slot in `scale.range`. Scale flavour only.
    */
   failingEntries: {color: string; index: number}[] | null;
@@ -116,9 +116,9 @@ function readContrastEvidence(issue: AccessibilityIssue): ContrastEvidence | nul
   if (typeof threshold !== 'number') return null;
 
   // failingColors on the scale flavour is an array of
-  // {color, ratio, index}. Keep the index alongside each colour so a
-  // per-colour fix can edit the right slot in scale.range; the bare
-  // colour strings are derived from it for consumers that only need those.
+  // {color, ratio, index}. Keep the index alongside each color so a
+  // per-color fix can edit the right slot in scale.range; the bare
+  // color strings are derived from it for consumers that only need those.
   const failingRaw = e.failingColors;
   let failingEntries: {color: string; index: number}[] | null = null;
   if (Array.isArray(failingRaw)) {
@@ -171,13 +171,13 @@ function isScaleIssue(ev: ContrastEvidence): boolean {
   return ev.elementType === 'non-text' && ev.allColors != null && ev.allColors.length > 1;
 }
 
-// ─── The set of colours that are actually failing ───────────────
+// ─── The set of colors that are actually failing ───────────────
 
 /**
- * Which colour(s) the "Change background" rec needs to optimise
+ * Which color(s) the "Change background" rec needs to optimise
  * against. For text and single-mark issues this is the lone
  * foreground. For scale issues it's the subset that fell below the
- * threshold - passing colours in the same scale don't need help and
+ * threshold - passing colors in the same scale don't need help and
  * shouldn't influence the choice of extreme.
  *
  * Returns an empty array when nothing is identifiable as failing,
@@ -191,7 +191,7 @@ function failingForegroundsFor(ev: ContrastEvidence): string[] {
 // ─── Foreground fix helpers ─────────────────────────────────────
 
 /**
- * Write a new foreground colour at the issue's source-appropriate
+ * Write a new foreground color at the issue's source-appropriate
  * location, mirroring how fontSizeRecs decides between in-place
  * replacement and config write.
  *
@@ -308,9 +308,9 @@ export const adjustTextLightness = buildAdjustForegroundRec({
   id: 'contrast-adjust-text',
   label: 'Adjust the text color',
   description:
-    'Keeps the background as it is and shifts the text colour just ' +
+    'Keeps the background as it is and shifts the text color just ' +
     'enough to meet the contrast threshold. Hue is preserved so the ' +
-    "colour's identity is kept; only its lightness changes. The " +
+    "color's identity is kept; only its lightness changes. The " +
     'lightest possible touch - only affects the failing element.',
   applies: isTextIssue,
 });
@@ -319,39 +319,39 @@ export const adjustMarkLightness = buildAdjustForegroundRec({
   id: 'contrast-adjust-mark',
   label: 'Adjust the mark color',
   description:
-    'Keeps the background as it is and shifts the mark colour just ' +
+    'Keeps the background as it is and shifts the mark color just ' +
     'enough to meet the contrast threshold. Hue is preserved so the ' +
-    "colour's identity is kept; only its lightness changes. The " +
+    "color's identity is kept; only its lightness changes. The " +
     'lightest possible touch - only affects the failing mark.',
   applies: isSingleMarkIssue,
 });
 
-// ─── Recommendation: adjust the failing scale colour(s) ─────────
+// ─── Recommendation: adjust the failing scale color(s) ─────────
 
 /**
  * "Adjust the failing colors" - the scale-flavour counterpart to
- * adjustMarkLightness. Keeps the background and every PASSING colour
- * untouched, and nudges only the colour(s) that fall below the
+ * adjustMarkLightness. Keeps the background and every PASSING color
+ * untouched, and nudges only the color(s) that fall below the
  * threshold until they clear it. Hue is preserved (OKLCH lightness
- * shift), so each adjusted colour keeps its identity.
+ * shift), so each adjusted color keeps its identity.
  *
  * This is the targeted alternative to "Change the background": it
  * fixes the failing element without a global change, and without
  * dropping the author's palette the way a scheme swap would.
  *
- * Only offered when EVERY failing colour can actually reach the
+ * Only offered when EVERY failing color can actually reach the
  * target ratio, so applying it fully resolves the issue instead of
- * leaving some colours still failing.
+ * leaving some colors still failing.
  */
 export const adjustScaleColors: Recommendation = {
   id: 'contrast-adjust-scale-colors',
   label: 'Adjust the failing colors',
   description:
-    'Keeps the background and every passing colour, and shifts only ' +
-    'the colour(s) below the contrast threshold just enough to clear ' +
-    'it. Hue is preserved - only lightness changes - so each colour ' +
+    'Keeps the background and every passing color, and shifts only ' +
+    'the color(s) below the contrast threshold just enough to clear ' +
+    'it. Hue is preserved - only lightness changes - so each color ' +
     'keeps its identity. The most targeted fix for a palette, since ' +
-    'the rest of the colours are left exactly as they are.',
+    'the rest of the colors are left exactly as they are.',
   family: 'adjustment',
 
   applicableWhen(issue) {
@@ -361,7 +361,7 @@ export const adjustScaleColors: Recommendation = {
     const failing = ev.failingEntries ?? [];
     if (failing.length === 0) return false;
 
-    // Only offer if every failing colour can actually reach the target;
+    // Only offer if every failing color can actually reach the target;
     // otherwise applying this would leave the warning partly in place.
     return failing.every((f) => adjustForegroundUntilRatio(f.color, ev.backgroundColor, ev.threshold) != null);
   },
@@ -378,7 +378,7 @@ export const adjustScaleColors: Recommendation = {
 
     // Edit each failing slot in turn. allColors is passed as the
     // fallback so a scheme-based scale is materialised to an explicit
-    // range before the colour is replaced.
+    // range before the color is replaced.
     let next = spec;
     for (const f of failing) {
       const adjusted = adjustForegroundUntilRatio(f.color, ev.backgroundColor, ev.threshold);
@@ -394,7 +394,7 @@ export const adjustScaleColors: Recommendation = {
 /**
  * "Use black/white text" - text-only nuclear option. Guarantees
  * maximum contrast against the background by snapping to whichever
- * extreme works. Sacrifices any colour the text had.
+ * extreme works. Sacrifices any color the text had.
  *
  * Only offered for text issues (a mark snapped to pure black/white
  * isn't usually meaningful).
@@ -403,9 +403,9 @@ export const useBlackOrWhiteText: Recommendation = {
   id: 'contrast-use-black-or-white-text',
   label: 'Use black or white text',
   description:
-    'Sets the text to the colour with the strongest possible contrast ' +
+    'Sets the text to the color with the strongest possible contrast ' +
     'against the background (black on a light background, white on a ' +
-    'dark one). Guaranteed to pass, but loses any colour the text had.',
+    'dark one). Guaranteed to pass, but loses any color the text had.',
   family: 'adjustment',
 
   applicableWhen(issue) {
@@ -425,7 +425,7 @@ export const useBlackOrWhiteText: Recommendation = {
 // ─── Recommendations: change background ─────────────────────────
 
 /**
- * "Change background" - keeps every foreground colour and adjusts the
+ * "Change background" - keeps every foreground color and adjusts the
  * background instead. Snaps to whichever extreme (white or near-
  * black) maximises the minimum contrast against the failing
  * foreground(s).
@@ -437,17 +437,17 @@ export const useBlackOrWhiteText: Recommendation = {
  * the current background. Previously a near-black scale on a black
  * background would snap to near-black, lowering contrast further; now
  * it correctly snaps to white. For scale issues, the optimisation
- * considers ONLY the colours that actually failed - passing colours
+ * considers ONLY the colors that actually failed - passing colors
  * in the same scale don't need help and shouldn't drag the choice.
  */
 export const changeBackground: Recommendation = {
   id: 'contrast-change-background',
   label: 'Change the background',
   description:
-    'Keeps every foreground colour and switches the background to the ' +
+    'Keeps every foreground color and switches the background to the ' +
     'extreme (white or near-black) that maximises contrast for the ' +
     'failing element. Fixes the failure without touching element ' +
-    'colours, but is a global change and may affect other parts of ' +
+    'colors, but is a global change and may affect other parts of ' +
     'the chart.',
   family: 'adjustment',
 
@@ -524,7 +524,7 @@ function buildSchemeSwapRec(args: {schemeName: string; schemeType: SchemeType; s
 
     apply(issue, spec) {
       // The pointer addresses the scale.range or scale.scheme; its
-      // parent is the scale object - same shape colourblindSafetyRecs
+      // parent is the scale object - same shape colorblindSafetyRecs
       // and colorRiskRecs use.
       return setScheme(spec, parentPointer(issue.jsonPointer), args.schemeName);
     },

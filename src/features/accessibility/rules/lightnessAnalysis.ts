@@ -33,7 +33,7 @@
  *     trade lightness uniformity for hue diversity by design
  *     (Brewer 2003; Wong 2011), so a ΔL* test would flag every
  *     well-designed qualitative palette. Greyscale legibility for
- *     categorical data is the colour-only-encoding rule's concern,
+ *     categorical data is the color-only-encoding rule's concern,
  *     not this rule's.
  */
 

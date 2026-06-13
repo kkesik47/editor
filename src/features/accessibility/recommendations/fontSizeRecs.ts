@@ -4,7 +4,7 @@
  * Recommendations for issues from `fontSizeRule`
  * (readability minimums: 16 px titles, 13 px labels).
  *
- * Unlike the colour rules, font size has essentially no trade-off
+ * Unlike the color rules, font size has essentially no trade-off
  * space: the fix is "make it at least the recommended minimum". So
  * each issue gets a single recommendation that bumps the size up to
  * its threshold - the smallest change that satisfies the guideline,

@@ -45,7 +45,7 @@
  *
  * References:
  *   Borland & Taylor (2007), "Rainbow Color Map (Still) Harmful"
- *   Crameri, Shephard & Heron (2020), "Misuse of colour in science"
+ *   Crameri, Shephard & Heron (2020), "Misuse of color in science"
  */
 
 import {parse, differenceCiede2000} from 'culori';
